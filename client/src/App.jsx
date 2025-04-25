@@ -17,6 +17,7 @@ import HallCustomerDashboard from "./pages/HallCustomerDashboard";
 import Contact from "./pages/contact";
 import Services from "./pages/services";
 import Locations from "./pages/Locations";
+import ResetPassword from "./pages/resetPassword";
 
 const Router = createBrowserRouter([
   {
@@ -42,33 +43,37 @@ const Router = createBrowserRouter([
       },
       {
         path: "/forgot-password",
-        element: <ForgotPassword />
+        element: <ForgotPassword />,
       },
       {
         path: "/manager-dashboard",
-        element: <ManagerDashboard />
+        element: <ManagerDashboard />,
       },
       {
         path: "/customer-dashboard",
-        element: <HallCustomerDashboard />
+        element: <HallCustomerDashboard />,
       },
       {
         path: "/contact",
-        element: <Contact />
+        element: <Contact />,
       },
       {
         path: "/services",
-        element: <Services />
+        element: <Services />,
       },
       {
         path: "/locations",
-        element: <Locations/>
-      }
+        element: <Locations />,
+      },
     ],
   },
   {
     path: "/hall/:id",
     element: <HallProfile />,
+  },
+  {
+    path: "/reset-password",
+    element: <ResetPassword />,
   },
 ]);
 

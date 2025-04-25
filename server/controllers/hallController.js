@@ -1,8 +1,8 @@
 // const { PrismaClient } = require('@prisma/client');
-import { PrismaClient } from '@prisma/client';
+const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
-export const createHall = async (req, res) => {
+ const createHall = async (req, res) => {
   try {
     const { name, description, capacity, price, imageURLs, status, addressId, amenities } = req.body;
     const hall = await prisma.hall.create({
@@ -26,7 +26,7 @@ export const createHall = async (req, res) => {
   }
 };
 
-export const updateHall = async (req, res) => {
+ const updateHall = async (req, res) => {
   try {
     const { imageURLs, amenities, ...rest } = req.body;
 
@@ -49,7 +49,7 @@ export const updateHall = async (req, res) => {
   }
 };
 
-export const deleteHall = async (req, res) => {
+ const deleteHall = async (req, res) => {
   const hallId = req.params.id;
 
   try {
@@ -86,7 +86,7 @@ export const deleteHall = async (req, res) => {
   }
 };
 
-export const getAllHalls = async (req, res) => {
+ const getAllHalls = async (req, res) => {
   console.log("Hello")
   try {
     const halls = await prisma.hall.findMany({
@@ -102,7 +102,7 @@ export const getAllHalls = async (req, res) => {
   }
 };
 
-export const getSingleHall = async (req, res) => {
+ const getSingleHall = async (req, res) => {
   try {
     const hall = await prisma.hall.findUnique({
       where: { hallId: req.params.id },
@@ -119,7 +119,7 @@ export const getSingleHall = async (req, res) => {
   }
 };
 
-export const getHallAmenities = async (req, res) => {
+ const getHallAmenities = async (req, res) => {
   try {
     const amenities = await prisma.amenitiesHall.findMany({
       where: { hallId: req.params.id },
@@ -131,7 +131,7 @@ export const getHallAmenities = async (req, res) => {
   }
 };
 
-export const getHallBookings = async (req, res) => {
+ const getHallBookings = async (req, res) => {
   try {
     const bookings = await prisma.booking.findMany({ where: { hallId: req.params.id } });
     res.json(bookings);
@@ -140,7 +140,7 @@ export const getHallBookings = async (req, res) => {
   }
 };
 
-export const searchHalls = async (req, res) => {
+ const searchHalls = async (req, res) => {
   try {
     const { city, minPrice, maxPrice } = req.query;
     const halls = await prisma.hall.findMany({
@@ -161,7 +161,7 @@ export const searchHalls = async (req, res) => {
   }
 };
 
-export const checkAvailability = async (req, res) => {
+ const checkAvailability = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
 
@@ -207,7 +207,7 @@ export const checkAvailability = async (req, res) => {
   }
 };
 
-export const getHallReviews = async (req, res) => {
+ const getHallReviews = async (req, res) => {
   try {
     const reviews = await prisma.review.findMany({ where: { hallId: req.params.id } });
     res.json(reviews);
@@ -216,7 +216,7 @@ export const getHallReviews = async (req, res) => {
   }
 };
 
-export const postReview = async (req, res) => {
+ const postReview = async (req, res) => {
   try {
     const { rating, comment } = req.body;
     const hallId = req.params.id;
@@ -226,9 +226,9 @@ export const postReview = async (req, res) => {
       where: {
         userId,
         hallId,
-        status: 'approved', 
+        status: 'approved',
         endDate: {
-          lt: new Date() 
+          lt: new Date()
         }
       }
     });
@@ -264,7 +264,7 @@ export const postReview = async (req, res) => {
   }
 };
 
-export const getTopRatedHalls = async (req, res) => {
+ const getTopRatedHalls = async (req, res) => {
   try {
     const halls = await prisma.hall.findMany({
       include: {
@@ -282,7 +282,7 @@ export const getTopRatedHalls = async (req, res) => {
   }
 };
 
-export const getOwnedHalls = async (req, res) => {
+ const getOwnedHalls = async (req, res) => {
   try {
     const halls = await prisma.hall.findMany({
       where: { userId: req.user.userId },
@@ -292,4 +292,20 @@ export const getOwnedHalls = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch your halls' });
   }
+};
+
+module.exports = {
+  createHall,
+  updateHall,
+  deleteHall,
+  getAllHalls,
+  getSingleHall,
+  getHallAmenities,
+  getHallBookings,
+  searchHalls,
+  checkAvailability,
+  getHallReviews,
+  postReview,
+  getTopRatedHalls,
+  getOwnedHalls
 };
