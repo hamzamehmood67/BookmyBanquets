@@ -175,7 +175,7 @@ router.post('/reset-password/:token', validateData(userSchemaResetPassword), asy
 
 
 const sendVerificationEmail = async (email, token) => {
-    const verificationLink = `http://localhost:3000/api/v1/user/verify-email?token=${token}`;
+    const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
 
     const mailOptions = {
         from: process.env.EMAIL_USER,

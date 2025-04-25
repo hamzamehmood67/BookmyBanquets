@@ -54,12 +54,10 @@ const Login = () => {
         login(res.data.user, res.data.token);
         showAlert("Login successful!", "success"); // Use showAlert here
         navigate("/"); // Redirect to the home page after successful login
-      } else {
-        console.log("Login failed:", res.data.error);
-        showAlert(`${res.data.error}`, "failure"); // Use showAlert here
       }
     } catch (e) {
       console.error("Error:", e);
+      showAlert(`${e.response.data.error}`, "failure"); // Use showAlert here
     } finally {
       setIsSubmitted(false);
     }

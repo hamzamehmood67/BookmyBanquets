@@ -1,8 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// // Get all addresses
-export const getAllAddresses = async (req, res) => {
+// Get all addresses
+const getAllAddresses = async (req, res) => {
     try {
         const addresses = await prisma.address.findMany();
         res.json(addresses);
@@ -11,8 +11,8 @@ export const getAllAddresses = async (req, res) => {
     }
 };
 
-// // Get address by ID
-export const getAddressById = async (req, res) => {
+// Get address by ID
+const getAddressById = async (req, res) => {
     try {
         const address = await prisma.address.findUnique({
             where: { addressId: req.params.id },
@@ -26,8 +26,8 @@ export const getAddressById = async (req, res) => {
     }
 };
 
-// // Create a new address
-export const createAddress = async (req, res) => {
+// Create a new address
+const createAddress = async (req, res) => {
     try {
         const { addressLine, city, state, country } = req.body;
 
@@ -40,14 +40,14 @@ export const createAddress = async (req, res) => {
             },
         });
 
-        res.status(200).json({newAddress , message: "Adress added successfully" });
+        res.status(200).json({ newAddress, message: "Address added successfully" });
     } catch (error) {
         res.status(500).json({ error: 'Error creating address', details: error.message });
     }
 };
 
-// // Update address
-export const updateAddress = async (req, res) => {
+// Update address
+const updateAddress = async (req, res) => {
     try {
         const { addressLine, city, state, country } = req.body;
 
@@ -75,8 +75,8 @@ export const updateAddress = async (req, res) => {
     }
 };
 
-// // Delete address
-export const deleteAddress = async (req, res) => {
+// Delete address
+const deleteAddress = async (req, res) => {
     try {
         const existingAddress = await prisma.address.findUnique({
             where: { addressId: req.params.id },
@@ -94,4 +94,12 @@ export const deleteAddress = async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: 'Error deleting address', details: error.message });
     }
+};
+
+module.exports = {
+    getAllAddresses,
+    getAddressById,
+    createAddress,
+    updateAddress,
+    deleteAddress,
 };
