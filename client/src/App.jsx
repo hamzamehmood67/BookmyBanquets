@@ -18,7 +18,7 @@ import Contact from "./pages/contact";
 import Services from "./pages/services";
 import Locations from "./pages/Locations";
 import ResetPassword from "./pages/resetPassword";
-
+import VerifyEmail from "./pages/EmailVerification";
 const Router = createBrowserRouter([
   {
     path: "/",
@@ -74,6 +74,10 @@ const Router = createBrowserRouter([
   {
     path: "/reset-password",
     element: <ResetPassword />,
+  },
+  {
+    path: "verify-email",
+    element: <VerifyEmail />,
   },
 ]);
 
