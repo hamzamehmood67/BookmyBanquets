@@ -13,13 +13,14 @@ const {
     getHallReviews,
     postReview,
     getTopRatedHalls,
-    getOwnedHalls
+    getOwnedHalls,
+    listPublicHalls
 } = require('../controllers/hallController.js');
 
 const router = express.Router();
 
 // Core Routes
-router.get('/', getAllHalls);                           // Public - Get all halls
+router.get('/', listPublicHalls);                           // Public - Get all halls
 router.get('/:id', getSingleHall);                      // Public - Get single hall
 router.post('/', authenticateHallManager, createHall);  // Hall Manager - Create hall
 router.put('/:id', authenticateHallManager,verifyHallOwnership, updateHall); // Hall Manager - Update hall

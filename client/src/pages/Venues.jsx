@@ -1,124 +1,77 @@
+// pages/venues (or wherever this page lives)
+import { useEffect, useState } from "react";
+import axios from "axios";
 import Footer from "../components/FooterNew";
 import Hero from "../components/Hero";
-import VenueListing from "../components/VenueLising";
 import VenueGrid from "../components/VenueGrid";
 
-const venues = [
-  {
-    id: 1,
-    name: "The Grand Ballroom",
-    location: "Manhattan, New York",
-    image:
-      "https://images.pexels.com/photos/3201763/pexels-photo-3201763.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-    price: "$5,000",
-    capacity: "300-500 guests",
-    rating: 4.9,
-    reviewCount: 124,
-    featured: true,
-  },
-  {
-    id: 2,
-    name: "Royal Gardens",
-    location: "Beverly Hills, CA",
-    image:
-      "https://images.pexels.com/photos/2291462/pexels-photo-2291462.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-    price: "$4,500",
-    capacity: "200-350 guests",
-    rating: 4.8,
-    reviewCount: 98,
-    featured: true,
-  },
-  {
-    id: 3,
-    name: "Oceanview Terrace",
-    location: "Miami Beach, FL",
-    image:
-      "https://images.pexels.com/photos/1616113/pexels-photo-1616113.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-    price: "$6,200",
-    capacity: "100-250 guests",
-    rating: 4.7,
-    reviewCount: 86,
-    featured: true,
-  },
-  {
-    id: 4,
-    name: "The Majestic",
-    location: "Chicago, IL",
-    image:
-      "https://images.pexels.com/photos/260922/pexels-photo-260922.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-    price: "$3,800",
-    capacity: "150-300 guests",
-    rating: 4.6,
-    reviewCount: 74,
-    featured: true,
-  },
-  {
-    id: 5,
-    name: "Crystal Palace",
-    location: "Las Vegas, NV",
-    image:
-      "https://images.pexels.com/photos/3038424/pexels-photo-3038424.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-    price: "$7,500",
-    capacity: "400-800 guests",
-    rating: 4.9,
-    reviewCount: 156,
-    featured: true,
-  },
-  {
-    id: 2,
-    name: "Royal Gardens",
-    location: "Beverly Hills, CA",
-    image:
-      "https://images.pexels.com/photos/2291462/pexels-photo-2291462.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-    price: "$4,500",
-    capacity: "200-350 guests",
-    rating: 4.8,
-    reviewCount: 98,
-    featured: true,
-  },
-  {
-    id: 3,
-    name: "Oceanview Terrace",
-    location: "Miami Beach, FL",
-    image:
-      "https://images.pexels.com/photos/1616113/pexels-photo-1616113.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-    price: "$6,200",
-    capacity: "100-250 guests",
-    rating: 4.7,
-    reviewCount: 86,
-    featured: true,
-  },
-  {
-    id: 4,
-    name: "The Majestic",
-    location: "Chicago, IL",
-    image:
-      "https://images.pexels.com/photos/260922/pexels-photo-260922.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-    price: "$3,800",
-    capacity: "150-300 guests",
-    rating: 4.6,
-    reviewCount: 74,
-    featured: true,
-  },
-  {
-    id: 5,
-    name: "Crystal Palace",
-    location: "Las Vegas, NV",
-    image:
-      "https://images.pexels.com/photos/3038424/pexels-photo-3038424.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-    price: "$7,500",
-    capacity: "400-800 guests",
-    rating: 4.9,
-    reviewCount: 156,
-    featured: true,
-  },
-];
+const API = "http://localhost:3000/api/v1";
+
+const firstImage = (imageURLs) => {
+  if (!imageURLs) return "/placeholder.svg?height=300&width=500";
+  if (Array.isArray(imageURLs)) return imageURLs[0] || "/placeholder.svg?height=300&width=500";
+  const first = String(imageURLs)
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)[0];
+  return first || "/placeholder.svg?height=300&width=500";
+};
+
+const pkr = (n) =>
+  new Intl.NumberFormat("en-PK", { style: "currency", currency: "PKR", maximumFractionDigits: 0 }).format(n || 0);
+
 export default function Home() {
+  const [venues, setVenues] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        // NEW: use the public listing endpoint with aggregates
+        // adjust the path to whatever you exposed for listPublicHall
+        const { data } = await axios.get(`${API}/hall`);
+
+        // Flexible: accept either {venues:[...]} or raw array
+        const rows = Array.isArray(data) ? data : (data?.venues ?? data?.halls ?? []);
+
+        const mapped = rows.map((h) => ({
+          id: h.id || h.hallId,
+          name: h.name,
+          // if backend already sends `location` string, use it; else build from address
+          location: h.location ?? (h.address ? `${h.address.city ?? ""}, ${h.address.state ?? ""}` : ""),
+          image: firstImage(h.image ?? h.imageURLs),
+          price: pkr(h.price),
+          capacity: `${h.capacity} guests`,
+          rating: Number(h.rating ?? 0),
+          reviewCount: Number(h.reviewCount ?? 0),
+          featured: Boolean(h.featured ?? false),
+        }));
+
+        setVenues(mapped);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
   return (
     <div>
-      <Hero></Hero>
-      <VenueGrid venues={venues} />
-      <Footer></Footer>
+      <Hero />
+
+      {loading ? (
+        <div className="py-16 flex items-center justify-center">
+          <div className="h-10 w-10 rounded-full border-4 border-gray-300 border-t-[#FF477E] animate-spin" />
+        </div>
+      ) : venues.length === 0 ? (
+        <div className="py-16 text-center text-gray-600">No venues available right now.</div>
+      ) : (
+        <VenueGrid venues={venues} />
+      )}
+
+      <Footer />
     </div>
   );
 }

@@ -13,8 +13,8 @@ const prisma = new PrismaClient();
         price,
         imageURLs: imageURLs.join(','),
         status,
-        userId: req.user.userId,
-        addressId,
+        user:    { connect: { userId: req.user.userId } },
+        address: { connect: { addressId } },
         amenities: {
           create: amenities.map(id => ({ amenityId: id }))
         }
@@ -26,28 +26,51 @@ const prisma = new PrismaClient();
   }
 };
 
- const updateHall = async (req, res) => {
+// controllers/hallController.js
+const updateHall = async (req, res) => {
   try {
-    const { imageURLs, amenities, ...rest } = req.body;
+    const { id } = req.params;
+    const { name, description, capacity, price, imageURLs, status, addressId, amenities } = req.body;
 
-    // Format the imageURLs
-    const formattedData = {
-      ...rest,
-      ...(imageURLs && { imageURLs: imageURLs.join(',') })
-    };
+    // validate hall exists & ownership is already checked by middleware
+    const exists = await prisma.hall.findUnique({ where: { hallId: id }, select: { hallId: true } });
+    if (!exists) return res.status(404).json({ error: 'Hall not found' });
 
-    // TODO: Update amenities properly (optional step shown below)
+    const imagesJoined = Array.isArray(imageURLs) ? imageURLs.join(',') : (imageURLs || '');
 
-    const updated = await prisma.hall.update({
-      where: { hallId: req.params.id },
-      data: formattedData
+    // transaction: reset amenities, then update hall
+    const hall = await prisma.$transaction(async (tx) => {
+      // wipe current amenity links
+      await tx.amenitiesHall.deleteMany({ where: { hallId: id } });
+
+      // update hall
+      const updated = await tx.hall.update({
+        where: { hallId: id },
+        data: {
+          name,
+          description,
+          capacity: Number(capacity) || 0,
+          price: Number(price) || 0,
+          imageURLs: imagesJoined,
+          status,                      // or keep previous if not sent
+          addressId,                   // keep linkage
+          amenities: {
+            create: (amenities || []).map((amenityId) => ({ amenityId }))
+          }
+        },
+        include: { address: true, amenities: true }
+      });
+
+      return updated;
     });
 
-    res.json({ status: 'success', data: updated, message: 'Hall updated successfully' });
+    return res.status(200).json({ hall, message: 'Hall updated successfully' });
   } catch (err) {
-    res.status(400).json({ error: 'Hall update failed', details: err.message });
+    console.error('updateHall error', err);
+    return res.status(500).json({ error: 'Error updating hall', details: err.message });
   }
 };
+
 
  const deleteHall = async (req, res) => {
   const hallId = req.params.id;
@@ -87,7 +110,6 @@ const prisma = new PrismaClient();
 };
 
  const getAllHalls = async (req, res) => {
-  console.log("Hello")
   try {
     const halls = await prisma.hall.findMany({
       include: {
@@ -99,6 +121,42 @@ const prisma = new PrismaClient();
     res.json(halls);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch halls' });
+  }
+};
+
+// controllers/hallController.js
+const listPublicHalls = async (req, res) => {
+  try {
+    const halls = await prisma.hall.findMany({
+      where: { status: "active" },
+      include: { address: true }
+    });
+
+    const aggs = await prisma.review.groupBy({
+      by: ["hallId"],
+      _avg: { rating: true },
+      _count: { rating: true }
+    });
+    const aggByHall = Object.fromEntries(aggs.map(a => [a.hallId, a]));
+
+    const venues = halls.map(h => {
+      const a = aggByHall[h.hallId];
+      return {
+        id: h.hallId,
+        name: h.name,
+        location: `${h.address?.city || ""}, ${h.address?.state || ""}`,
+        image: h.imageURLs,     // FE will pick first
+        price: h.price,
+        capacity: h.capacity,
+        rating: a ? Number((a._avg.rating || 0).toFixed(1)) : 0,
+        reviewCount: a ? a._count.rating : 0,
+        featured: false
+      };
+    });
+
+    res.status(200).json({ venues });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch halls", details: err.message });
   }
 };
 
@@ -307,5 +365,6 @@ module.exports = {
   getHallReviews,
   postReview,
   getTopRatedHalls,
-  getOwnedHalls
+  getOwnedHalls,
+  listPublicHalls
 };
