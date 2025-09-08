@@ -2,6 +2,8 @@
 "use client"
 
 import { useState } from "react"
+import { AlertContext } from "../context/AlertContext"
+import { useContext } from "react"
 import {
   Calendar,
   DollarSign,
@@ -16,7 +18,8 @@ import {
   Upload,
   X,
 } from "lucide-react"
-
+import axios from "axios"
+import { useEffect } from "react"
 // Update the bookingsData array with Pakistani names, numbers, and prices
 const bookingsData = [
   {
@@ -118,92 +121,6 @@ const bookingsData = [
   },
 ]
 
-// Update analytics data with Pakistani currency
-const analyticsData = {
-  totalBookings: 45,
-  approvedBookings: 28,
-  pendingBookings: 12,
-  rejectedBookings: 5,
-  totalRevenue: "PKR 8,750,000",
-  averageBookingValue: "PKR 194,444",
-  popularPackage: "Premium Package",
-  popularEventType: "Wedding Reception",
-  bookingsByMonth: [
-    { month: "Jan", count: 2 },
-    { month: "Feb", count: 3 },
-    { month: "Mar", count: 5 },
-    { month: "Apr", count: 7 },
-    { month: "May", count: 10 },
-    { month: "Jun", count: 8 },
-    { month: "Jul", count: 6 },
-    { month: "Aug", count: 4 },
-    { month: "Sep", count: 0 },
-    { month: "Oct", count: 0 },
-    { month: "Nov", count: 0 },
-    { month: "Dec", count: 0 },
-  ],
-  revenueByMonth: [
-    { month: "Jan", amount: 250000 },
-    { month: "Feb", amount: 375000 },
-    { month: "Mar", amount: 625000 },
-    { month: "Apr", amount: 1050000 },
-    { month: "May", amount: 1750000 },
-    { month: "Jun", amount: 1400000 },
-    { month: "Jul", amount: 900000 },
-    { month: "Aug", amount: 600000 },
-    { month: "Sep", amount: 0 },
-    { month: "Oct", amount: 0 },
-    { month: "Nov", amount: 0 },
-    { month: "Dec", amount: 0 },
-  ],
-}
-
-// Update package options with Pakistani currency
-const packageOptions = [
-  {
-    id: "PKG001",
-    name: "Essential Package",
-    price: "PKR 125,000",
-    features: ["Basic Hall Decoration", "Standard Lighting", "Buffet Service for 100 Guests"],
-  },
-  {
-    id: "PKG002",
-    name: "Premium Package",
-    price: "PKR 225,000",
-    features: ["Enhanced Hall Decoration", "Premium Lighting", "Buffet Service for 200 Guests", "DJ and Sound System"],
-  },
-  {
-    id: "PKG003",
-    name: "Royal Package",
-    price: "PKR 350,000",
-    features: [
-      "Luxury Hall Decoration",
-      "Customizable Lighting",
-      "Buffet Service for 300 Guests",
-      "Live Band",
-      "Photography and Videography",
-    ],
-  },
-]
-
-// List of amenities
-const amenitiesList = [
-  { id: 1, name: "Air Conditioning", description: "Central air conditioning system" },
-  { id: 2, name: "Parking", description: "Dedicated parking space for guests" },
-  { id: 3, name: "WiFi", description: "High-speed internet access" },
-  { id: 4, name: "Sound System", description: "Professional audio equipment" },
-  { id: 5, name: "Stage", description: "Elevated platform for performances" },
-  { id: 6, name: "Catering", description: "In-house food service" },
-  { id: 7, name: "Decoration", description: "Event decoration services" },
-  { id: 8, name: "Valet Parking", description: "Attendants to park guest vehicles" },
-  { id: 9, name: "Bridal Room", description: "Private room for bride preparation" },
-  { id: 10, name: "Projector", description: "Video projection equipment" },
-  { id: 11, name: "Backup Generator", description: "Power backup during outages" },
-  { id: 12, name: "Wheelchair Access", description: "Facilities for disabled guests" },
-  { id: 13, name: "Prayer Room", description: "Dedicated space for prayers" },
-  { id: 14, name: "Smoking Area", description: "Designated smoking zone" },
-  { id: 15, name: "Security", description: "24/7 security personnel" },
-]
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("dashboard")
@@ -213,13 +130,36 @@ const Dashboard = () => {
   const [bookings, setBookings] = useState(bookingsData)
   const [filterStatus, setFilterStatus] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedAmenities, setSelectedAmenities] = useState([1, 2, 3, 4, 6, 7, 11, 13, 15])
   const [hallImages, setHallImages] = useState([
     "/placeholder.svg?height=300&width=500",
     "/placeholder.svg?height=300&width=500",
   ])
+  const [name, setName] = useState("Lahore Royal Palace Banquet Hall")
+  const [contactEmail, setContactEmail] = useState("contact@royalpalace.pk")
+  const [contactPhone, setContactPhone] = useState("+92 300 1234567")
+  const [description, setDescription] = useState("Lahore Royal Palace Banquet Hall has been ...")
+  const [addressLine, setAddressLine] = useState("123 Main Street, Model Town")
+  const [city, setCity] = useState("Lahore")
+  const [stateProv, setStateProv] = useState("Punjab")
+  const [postalCode, setPostalCode] = useState("54000")
+  const [capacity, setCapacity] = useState(300)
+  const [price, setPrice] = useState(225000)
+  const { showAlert } = useContext(AlertContext);
+  const [myHalls, setMyHalls] = useState([]);
+  const [hallsLoading, setHallsLoading] = useState(false);
+  const [deletingHallId, setDeletingHallId] = useState(null);
+  // EDIT state
+  const [editHallId, setEditHallId] = useState(null);
+  const [loadingEdit, setLoadingEdit] = useState(false);
+  const [originalAddressId, setOriginalAddressId] = useState(null);
+  // Base API
+  const API = 'http://localhost:3000/api/v1';
 
-  // Filter bookings based on status and search query
+
+  // IMPORTANT: load real amenities from backend
+  const [amenities, setAmenities] = useState([])
+  const [selectedAmenities, setSelectedAmenities] = useState([])
+
   const filteredBookings = bookings.filter((booking) => {
     const matchesStatus = filterStatus === "all" || booking.status === filterStatus
     const matchesSearch =
@@ -228,14 +168,75 @@ const Dashboard = () => {
     return matchesStatus && matchesSearch
   })
 
+  const asArray = (imageURLs) =>
+  Array.isArray(imageURLs)
+    ? imageURLs
+    : String(imageURLs || '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+
   const pendingBookings = bookings.filter((booking) => booking.status === "pending")
   const approvedBookings = bookings.filter((booking) => booking.status === "approved")
   const rejectedBookings = bookings.filter((booking) => booking.status === "rejected")
+
 
   const handleApproveBooking = (id) => {
     setBookings(bookings.map((booking) => (booking.id === id ? { ...booking, status: "approved" } : booking)))
     setIsModalOpen(false)
   }
+
+  const loadHallForEdit = async (rowHall) => {
+    try {
+      setLoadingEdit(true);
+      setEditHallId(rowHall.hallId);
+      setActiveTab('editHall'); // navigate to the Edit tab
+
+      // 1) Get fresh hall (in case list is light)
+      const { data: hallData } = await axios.get(`${API}/hall/${rowHall.hallId}`);
+      const hall = hallData?.hall ?? hallData;
+
+      // 2) Address info (either in hall.address or fetch)
+      let addr = hall?.address;
+      if (!addr?.addressId && hall?.addressId) {
+        const { data } = await axios.get(`${API}/address/${hall.addressId}`);
+        addr = data?.address ?? data;
+      }
+
+      // 3) Hall amenities (ids only)
+      const { data: amData } = await axios.get(`${API}/hall/${rowHall.hallId}/amenities`);
+      const hallAmenityIds = (amData?.amenities ?? amData ?? []).map((a) =>
+        a.amenityId || a.amenity?.amenityId
+      );
+
+      // 4) Fill your existing state (reusing the Create form state)
+      setName(hall?.name || '');
+      setDescription(hall?.description || '');
+      setCapacity(hall?.capacity ?? 0);
+      setPrice(hall?.price ?? 0);
+      setHallImages(asArray(hall?.imageURLs)); // make it string[]
+
+      setAddressLine(addr?.addressLine || '');
+      setCity(addr?.city || '');
+      setStateProv(addr?.state || '');
+      setPostalCode(addr?.postalCode || ''); // if you store it
+      setOriginalAddressId(addr?.addressId || hall?.addressId || null);
+
+      // all amenities list should already be loaded in useEffect; if not, fetch here too
+      if (amenities.length === 0) {
+        const { data } = await axios.get(`${API}/amenity`);
+        setAmenities(data?.amenities ?? data ?? []);
+      }
+      setSelectedAmenities(hallAmenityIds);
+    } catch (e) {
+      console.error(e);
+      showAlert('Failed to load hall for edit.', 'failure');
+      setActiveTab('myhalls');
+    } finally {
+      setLoadingEdit(false);
+    }
+  };
+
 
   const handleRejectBooking = (id) => {
     if (!rejectionReason.trim()) {
@@ -260,30 +261,278 @@ const Dashboard = () => {
     return new Date(dateString).toLocaleDateString("en-IN", options)
   }
 
-  const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files)
+  const handleImageUpload = async (e) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+
+    // enforce 5-image cap
     if (hallImages.length + files.length > 5) {
-      alert("You can only upload a maximum of 5 images")
-      return
+      showAlert(`You can upload ${5 - hallImages.length} more image(s).`, "failure");
+      return;
     }
 
-    const newImages = files.map((file) => URL.createObjectURL(file))
-    setHallImages([...hallImages, ...newImages])
+    // optional type/size guard in FE too
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    for (const f of files) {
+      if (!allowed.includes(f.type)) {
+        showAlert(`Invalid type for ${f.name}. Only JPG/PNG/WEBP allowed.`, "failure");
+        return;
+      }
+      if (f.size > 2 * 1024 * 1024) {
+        showAlert(`${f.name} is larger than 2MB.`, "failure");
+        return;
+      }
+    }
+
+    try {
+      const form = new FormData();
+      files.forEach(f => form.append('images', f));
+
+      const res = await axios.post(
+        'http://localhost:3000/api/v1/upload/hall-images',
+        form,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+
+      const urls = res.data?.urls ?? [];
+      if (!urls.length) {
+        showAlert("No images uploaded.", "failure");
+        return;
+      }
+      // store real public URLs
+      setHallImages(prev => [...prev, ...urls].slice(0, 5));
+      showAlert("Images uploaded.", "success");
+    } catch (err) {
+      console.error(err);
+      showAlert("Failed to upload images.", "failure");
+    }
+  };
+
+  const handleDeleteHall = async (hall) => {
+    if (!token) { showAlert("You must be logged in as Hall Manager.", "failure"); return; }
+    const ok = confirm(`Delete hall "${hall.name}"? This cannot be undone.`);
+    if (!ok) return;
+
+    setDeletingHallId(hall.hallId);
+
+    // Optimistic UI: remove immediately
+    const prev = [...myHalls];
+    setMyHalls(myHalls.filter(h => h.hallId !== hall.hallId));
+
+    try {
+      // 1) Delete hall in backend
+      await axios.delete(`${API}/hall/${hall.hallId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      showAlert("Hall deleted.", "success");
+    } catch (err) {
+      console.error(err);
+      // Rollback on failure
+      setMyHalls(prev);
+      const msg = err?.response?.data?.error || "Failed to delete hall";
+      showAlert(msg, "failure");
+    } finally {
+      setDeletingHallId(null);
+    }
+  };
+
+  const handleUpdate = async () => {
+  if (!token) { showAlert("You must be logged in as Hall Manager.", "failure"); return; }
+  if (!editHallId) { showAlert("No hall selected.", "failure"); return; }
+  if (!name.trim() || !description.trim() || !addressLine.trim()) {
+    showAlert("Please fill all required fields.", "failure"); return;
+  }
+  if (selectedAmenities.length === 0) {
+    const ok = confirm("No amenities selected. Continue?");
+    if (!ok) return;
   }
 
-  const removeImage = (index) => {
-    const updatedImages = [...hallImages]
-    updatedImages.splice(index, 1)
-    setHallImages(updatedImages)
-  }
+  setSaving(true);
+  try {
+    // 1) Update address (idempotent; safer than diffing for viva)
+    if (!originalAddressId) {
+      showAlert("Missing address id on hall.", "failure");
+      setSaving(false);
+      return;
+    }
+    const addrPayload = {
+      addressLine,
+      city,
+      state: stateProv,
+      country: "Pakistan",
+      postalCode
+    };
+    await axios.put(`${API}/address/${originalAddressId}`, addrPayload, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
 
-  const toggleAmenity = (id) => {
-    if (selectedAmenities.includes(id)) {
-      setSelectedAmenities(selectedAmenities.filter((amenityId) => amenityId !== id))
-    } else {
-      setSelectedAmenities([...selectedAmenities, id])
+    // 2) Update hall
+    const payload = {
+      name,
+      description,
+      capacity: Number.isFinite(capacity) ? capacity : 0,
+      price: Number.isFinite(price) ? price : 0,
+      imageURLs: hallImages,            // string[]
+      addressId: originalAddressId,     // keep linkage
+      amenities: selectedAmenities      // string[] amenityIds
+      // status: (optional) keep as-is or expose a selector
+    };
+
+    await axios.put(`${API}/hall/${editHallId}`, payload, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    showAlert("Hall updated successfully!", "success");
+    // Refresh list and go back
+    await fetchOwnedHalls();
+    setActiveTab('myhalls');
+  } catch (err) {
+    console.error(err);
+    const msg = err?.response?.data?.error || "Failed to update hall";
+    showAlert(msg, "failure");
+  } finally {
+    setSaving(false);
+  }
+};
+
+
+
+  const removeImage = async (index) => {
+    const url = hallImages[index];
+    // If it's a server URL, ask backend to delete the file
+    const looksServerHosted = typeof url === 'string' && url.includes('/uploads/halls/');
+
+    // Optimistic UI update
+    const prev = [...hallImages];
+    const updated = [...hallImages];
+    updated.splice(index, 1);
+    setHallImages(updated);
+
+    if (!looksServerHosted) return; // placeholders / local previews don't need server delete
+
+    try {
+      await axios.post(
+        'http://localhost:3000/api/v1/upload/hall-images/delete',
+        { urls: [url] },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      showAlert('Image removed.', 'success');
+    } catch (err) {
+      console.error(err);
+      // Rollback
+      setHallImages(prev);
+      showAlert('Failed to delete image on server.', 'failure');
+    }
+  };
+
+
+  // Helper: PKR format
+  const pkr = (n) => new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', maximumFractionDigits: 0 }).format(Number(n || 0));
+
+  // Helper: first image (backend stores comma-separated string)
+  const firstImage = (imageURLs) => {
+    if (!imageURLs) return '/placeholder.svg?height=80&width=120';
+    if (Array.isArray(imageURLs)) return imageURLs[0] || '/placeholder.svg?height=80&width=120';
+    const first = String(imageURLs).split(',').map(s => s.trim()).filter(Boolean)[0];
+    return first || '/placeholder.svg?height=80&width=120';
+  };
+
+  // NEW: fetch owned halls
+  const fetchOwnedHalls = async () => {
+    if (!token) { showAlert("You must be logged in as Hall Manager.", "failure"); return; }
+    setHallsLoading(true);
+    try {
+      const { data } = await axios.get(`${API}/hall/owned/list`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      // depending on your controller shape
+      const halls = data?.halls ?? data ?? [];
+      setMyHalls(halls);
+    } catch (e) {
+      console.error(e);
+      showAlert("Failed to load your halls.", "failure");
+    } finally {
+      setHallsLoading(false);
+    }
+  };
+
+  // auth (adjust to your actual auth storage)
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+
+  useEffect(() => {
+    const loadAmenities = async () => {
+      try {
+        const { data } = await axios.get("http://localhost:3000/api/v1/amenity")
+        setAmenities(data?.amenities ?? data) // depending on your controller shape
+        console.log(amenities)
+        // (optionally) pre-select some:
+        // setSelectedAmenities(data.slice(0,6).map((a:any)=>a.amenityId))
+      } catch (e) {
+        console.error("Failed to load amenities", e)
+        alert("Could not load amenities. Please refresh.")
+      }
+    }
+    loadAmenities()
+
+    if (activeTab === 'myhalls') fetchOwnedHalls();
+  }, [activeTab])
+
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    if (!token) { alert("You must be logged in as Hall Manager."); return }
+    if (!name.trim() || !description.trim() || !addressLine.trim()) {
+      alert("Please fill all required fields."); return
+    }
+    if (selectedAmenities.length === 0) {
+      if (!confirm("No amenities selected. Continue?")) return
+    }
+    setSaving(true)
+    try {
+      // 1) Create/ensure Address
+      const addrPayload = {
+        addressLine,
+        city,
+        state: stateProv,
+        country: "Pakistan",
+        postalCode
+      }
+      const addrRes = await axios.post("http://localhost:3000/api/v1/address", addrPayload, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const addressId = addrRes.data?.address?.addressId ?? addrRes.data.newAddress?.addressId
+
+      // 2) Prepare hall payload (controller joins array to comma-separated string)
+      const payload = {
+        name,
+        description,
+        capacity: Number.isFinite(capacity) ? capacity : 0,
+        price: Number.isFinite(price) ? price : 0,
+        imageURLs: hallImages, // string[]
+        addressId,
+        status: "pending",
+        amenities: selectedAmenities // string[] of amenityId
+      }
+
+      const hallRes = await axios.post("http://localhost:3000/api/v1/hall", payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      showAlert("Hall created successfully!", "success")
+      // TODO: navigate to your “Owned Halls” or reset form
+    } catch (err) {
+      console.error(err)
+      // Surface server message if available
+      showAlert("Failed to create Hall", "failure")
+    } finally {
+      setSaving(false)
     }
   }
+
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
@@ -336,23 +585,18 @@ const Dashboard = () => {
             Bookings
           </button>
           <button
-            className={`px-4 py-3 font-medium text-sm ${activeTab === "calendar" ? "text-[#FF477E] border-b-2 border-[#FF477E]" : "text-gray-600 hover:text-gray-900"}`}
-            onClick={() => setActiveTab("calendar")}
-          >
-            Calendar
-          </button>
-          <button
-            className={`px-4 py-3 font-medium text-sm ${activeTab === "analytics" ? "text-[#FF477E] border-b-2 border-[#FF477E]" : "text-gray-600 hover:text-gray-900"}`}
-            onClick={() => setActiveTab("analytics")}
-          >
-            Analytics
-          </button>
-          <button
             className={`px-4 py-3 font-medium text-sm ${activeTab === "settings" ? "text-[#FF477E] border-b-2 border-[#FF477E]" : "text-gray-600 hover:text-gray-900"}`}
             onClick={() => setActiveTab("settings")}
           >
-            Settings
+            Create Hall
           </button>
+          <button
+            className={`px-4 py-3 font-medium text-sm ${activeTab === "myhalls" ? "text-[#FF477E] border-b-2 border-[#FF477E]" : "text-gray-600 hover:text-gray-900"}`}
+            onClick={() => setActiveTab("myhalls")}
+          >
+            Manage Halls
+          </button>
+
         </nav>
       </header>
 
@@ -368,7 +612,6 @@ const Dashboard = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500">Total Bookings</p>
-                    <p className="text-3xl font-bold text-gray-800 mt-1">{analyticsData.totalBookings}</p>
                   </div>
                   <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
                     <Calendar className="h-6 w-6 text-blue-600" />
@@ -407,7 +650,6 @@ const Dashboard = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500">Total Revenue</p>
-                    <p className="text-3xl font-bold text-gray-800 mt-1">{analyticsData.totalRevenue}</p>
                   </div>
                   <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
                     <DollarSign className="h-6 w-6 text-green-600" />
@@ -423,13 +665,11 @@ const Dashboard = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500">Avg. Booking Value</p>
-                    <p className="text-3xl font-bold text-gray-800 mt-1">{analyticsData.averageBookingValue}</p>
                   </div>
                   <div className="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center">
                     <BarChart2 className="h-6 w-6 text-purple-600" />
                   </div>
                 </div>
-                <div className="mt-4 text-sm text-purple-600">Most popular: {analyticsData.popularPackage}</div>
               </div>
             </div>
 
@@ -478,13 +718,12 @@ const Dashboard = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
                             className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                            ${
-                              booking.status === "approved"
+                            ${booking.status === "approved"
                                 ? "bg-green-100 text-green-800"
                                 : booking.status === "pending"
                                   ? "bg-yellow-100 text-yellow-800"
                                   : "bg-red-100 text-red-800"
-                            }`}
+                              }`}
                           >
                             {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                           </span>
@@ -689,13 +928,12 @@ const Dashboard = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
                             className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                            ${
-                              booking.status === "approved"
+                            ${booking.status === "approved"
                                 ? "bg-green-100 text-green-800"
                                 : booking.status === "pending"
                                   ? "bg-yellow-100 text-yellow-800"
                                   : "bg-red-100 text-red-800"
-                            }`}
+                              }`}
                           >
                             {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                           </span>
@@ -741,212 +979,6 @@ const Dashboard = () => {
           </div>
         )}
 
-        {activeTab === "calendar" && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">Event Calendar</h2>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-center mb-6">
-                <h3 className="text-lg font-medium text-gray-800">June 2025</h3>
-              </div>
-
-              <div className="grid grid-cols-7 gap-2 mb-2">
-                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                  <div key={day} className="text-center text-sm font-medium text-gray-500">
-                    {day}
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-7 gap-2">
-                {Array.from({ length: 30 }, (_, i) => {
-                  const day = i + 1
-                  const hasEvent = bookings.some((booking) => {
-                    const bookingDate = new Date(booking.date)
-                    return bookingDate.getDate() === day && bookingDate.getMonth() === 5 // June is month 5 (0-indexed)
-                  })
-
-                  const events = bookings.filter((booking) => {
-                    const bookingDate = new Date(booking.date)
-                    return bookingDate.getDate() === day && bookingDate.getMonth() === 5
-                  })
-
-                  return (
-                    <div
-                      key={day}
-                      className={`p-2 border rounded-lg min-h-[80px] ${hasEvent ? "border-[#FF477E]/30" : "border-gray-200"}`}
-                    >
-                      <div className="text-right text-sm font-medium text-gray-700 mb-1">{day}</div>
-                      {events.map((event) => (
-                        <div
-                          key={event.id}
-                          className={`text-xs p-1 rounded mb-1 truncate cursor-pointer
-                            ${
-                              event.status === "approved"
-                                ? "bg-green-100 text-green-800"
-                                : event.status === "pending"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-red-100 text-red-800"
-                            }`}
-                          onClick={() => openBookingModal(event)}
-                        >
-                          {event.eventType}
-                        </div>
-                      ))}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "analytics" && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">Analytics & Reports</h2>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-medium text-gray-800 mb-4">Bookings by Month</h3>
-                <div className="h-64">
-                  <div className="flex h-full items-end">
-                    {analyticsData.bookingsByMonth.map((item, index) => (
-                      <div key={index} className="flex-1 flex flex-col items-center">
-                        <div
-                          className="w-full bg-[#FF477E] rounded-t"
-                          style={{ height: `${(item.count / 10) * 100}%` }}
-                        ></div>
-                        <div className="text-xs text-gray-500 mt-2">{item.month}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-medium text-gray-800 mb-4">Revenue by Month (PKR)</h3>
-                <div className="h-64">
-                  <div className="flex h-full items-end">
-                    {analyticsData.revenueByMonth.map((item, index) => (
-                      <div key={index} className="flex-1 flex flex-col items-center">
-                        <div
-                          className="w-full bg-[#9D2235] rounded-t"
-                          style={{ height: `${(item.amount / 1750000) * 100}%` }}
-                        ></div>
-                        <div className="text-xs text-gray-500 mt-2">{item.month}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-medium text-gray-800 mb-4">Booking Status Distribution</h3>
-                <div className="relative pt-1">
-                  <div className="flex mb-2 items-center justify-between">
-                    <div>
-                      <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-green-600 bg-green-200">
-                        Approved
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs font-semibold inline-block text-green-600">
-                        {Math.round((approvedBookings.length / bookings.length) * 100)}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-green-200">
-                    <div
-                      style={{ width: `${(approvedBookings.length / bookings.length) * 100}%` }}
-                      className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-green-500"
-                    ></div>
-                  </div>
-
-                  <div className="flex mb-2 items-center justify-between">
-                    <div>
-                      <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-yellow-600 bg-yellow-200">
-                        Pending
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs font-semibold inline-block text-yellow-600">
-                        {Math.round((pendingBookings.length / bookings.length) * 100)}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-yellow-200">
-                    <div
-                      style={{ width: `${(pendingBookings.length / bookings.length) * 100}%` }}
-                      className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-yellow-500"
-                    ></div>
-                  </div>
-
-                  <div className="flex mb-2 items-center justify-between">
-                    <div>
-                      <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-red-600 bg-red-200">
-                        Rejected
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs font-semibold inline-block text-red-600">
-                        {Math.round((rejectedBookings.length / bookings.length) * 100)}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-red-200">
-                    <div
-                      style={{ width: `${(rejectedBookings.length / bookings.length) * 100}%` }}
-                      className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-red-500"
-                    ></div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-medium text-gray-800 mb-4">Popular Packages</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-[#FF477E] mr-2"></div>
-                    <span className="text-sm text-gray-600">Royal Package</span>
-                    <span className="ml-auto text-sm font-medium text-gray-900">40%</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-[#9D2235] mr-2"></div>
-                    <span className="text-sm text-gray-600">Premium Package</span>
-                    <span className="ml-auto text-sm font-medium text-gray-900">35%</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
-                    <span className="text-sm text-gray-600">Essential Package</span>
-                    <span className="ml-auto text-sm font-medium text-gray-900">25%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-medium text-gray-800 mb-4">Time Slot Distribution</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
-                    <span className="text-sm text-gray-600">Morning (10:00 AM - 2:00 PM)</span>
-                    <span className="ml-auto text-sm font-medium text-gray-900">30%</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-orange-500 mr-2"></div>
-                    <span className="text-sm text-gray-600">Afternoon (3:00 PM - 7:00 PM)</span>
-                    <span className="ml-auto text-sm font-medium text-gray-900">25%</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
-                    <span className="text-sm text-gray-600">Evening (7:30 PM - 11:30 PM)</span>
-                    <span className="ml-auto text-sm font-medium text-gray-900">45%</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {activeTab === "settings" && (
           <div className="space-y-6">
@@ -963,7 +995,7 @@ const Dashboard = () => {
                     <input
                       type="text"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
-                      defaultValue="Lahore Royal Palace Banquet Hall"
+                      onChange={(e) => setName(e.target.value)}
                     />
                   </div>
                   <div>
@@ -971,7 +1003,6 @@ const Dashboard = () => {
                     <input
                       type="email"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
-                      defaultValue="contact@royalpalace.pk"
                     />
                   </div>
                   <div>
@@ -979,16 +1010,36 @@ const Dashboard = () => {
                     <input
                       type="tel"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
-                      defaultValue="+92 300 1234567"
+                      placeholder="+92 300 1234567"
                     />
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Capacity</label>
+                    <input type="number" min={1}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E]"
+                      value={capacity}
+                      onChange={(e) => setCapacity(parseInt(e.target.value || "0"))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Base Price (PKR)</label>
+                    <input type="number" min={0}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E]"
+                      value={price}
+                      onChange={(e) => setPrice(parseFloat(e.target.value || "0"))}
+                    />
+                  </div>
+
+
 
                   <div className="col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                     <textarea
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
                       rows={4}
-                      defaultValue="Lahore Royal Palace Banquet Hall has been creating memorable celebrations for over a decade. Established in 2010, our venue has hosted more than 3,000 successful events including glamorous weddings, corporate galas, and milestone celebrations. Located in the heart of Lahore, we pride ourselves on exceptional service and attention to detail."
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Lahore Royal Palace Banquet Hall has been creating memorable celebrations for over a decade. Established in 2010, our venue has hosted more than 3,000 successful events including glamorous weddings, corporate galas, and milestone celebrations. Located in the heart of Lahore, we pride ourselves on exceptional service and attention to detail."
                     ></textarea>
                   </div>
 
@@ -1000,7 +1051,7 @@ const Dashboard = () => {
                         <input
                           type="text"
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
-                          defaultValue="123 Main Street, Model Town"
+                          placeholder="123 Main Street, Model Town"
                         />
                       </div>
                       <div>
@@ -1036,7 +1087,8 @@ const Dashboard = () => {
                         <input
                           type="text"
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
-                          defaultValue="54000"
+                          placeholder="54000"
+                          onChange={(e) => setPostalCode(e.target.value)}
                         />
                       </div>
                       <div>
@@ -1055,22 +1107,30 @@ const Dashboard = () => {
                 <div className="mt-8 border-t border-gray-200 pt-6">
                   <h4 className="text-lg font-medium text-gray-800 mb-4">Hall Amenities</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {amenitiesList.map((amenity) => (
-                      <div key={amenity.id} className="flex items-start space-x-2">
-                        <input
-                          type="checkbox"
-                          id={`amenity-${amenity.id}`}
-                          checked={selectedAmenities.includes(amenity.id)}
-                          onChange={() => toggleAmenity(amenity.id)}
-                          className="mt-1"
-                        />
-                        <label htmlFor={`amenity-${amenity.id}`} className="text-sm">
-                          <div className="font-medium text-gray-800">{amenity.name}</div>
-                          <div className="text-xs text-gray-500">{amenity.description}</div>
-                        </label>
-                      </div>
-                    ))}
+                    {amenities.map((amenity) => {
+                      const checked = selectedAmenities.includes(amenity.amenityId)
+                      return (
+                        <div key={amenity.amenityId} className="flex items-start space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`amenity-${amenity.amenityId}`}
+                            checked={checked}
+                            onChange={() => {
+                              setSelectedAmenities(checked
+                                ? selectedAmenities.filter(id => id !== amenity.amenityId)
+                                : [...selectedAmenities, amenity.amenityId])
+                            }}
+                            className="mt-1"
+                          />
+                          <label htmlFor={`amenity-${amenity.amenityId}`} className="text-sm">
+                            <div className="font-medium text-gray-800">{amenity.name}</div>
+                            <div className="text-xs text-gray-500">{amenity.description}</div>
+                          </label>
+                        </div>
+                      )
+                    })}
                   </div>
+
                 </div>
 
                 <div className="mt-8 border-t border-gray-200 pt-6">
@@ -1115,79 +1175,330 @@ const Dashboard = () => {
                 </div>
 
                 <div className="mt-6 flex justify-center">
-                  <button className="px-6 py-2 bg-[#FF477E] text-white rounded-lg hover:bg-[#9D2235]">
-                    Save Changes
+                  <button className="px-6 py-2 bg-[#FF477E] text-white rounded-lg hover:bg-[#9D2235]" onClick={handleSave} disabled={saving}>
+                    {saving ? "Saving..." : "Save"}
                   </button>
                 </div>
               </div>
             </div>
 
+
+          </div>
+        )}
+
+        {activeTab === "myhalls" && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-800">My Halls</h2>
+              <button
+                onClick={fetchOwnedHalls}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Refresh
+              </button>
+            </div>
+
             <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-800">Package Settings</h3>
-              </div>
-              <div className="p-6">
-                {packageOptions.map((pkg, index) => (
-                  <div key={pkg.id} className="mb-8 border rounded-lg p-4">
-                    <h4 className="text-xl font-medium text-gray-800 mb-3">{pkg.name}</h4>
-                    <div className="mb-3">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
-                        defaultValue={pkg.price}
-                      />
-                    </div>
-                    <div>
-                      <h5 className="text-sm font-medium text-gray-700 mb-2">Features:</h5>
-                      {pkg.features.map((feature, featureIndex) => (
-                        <div key={featureIndex} className="flex items-center text-sm mb-2">
-                          <input
-                            type="text"
-                            className="flex-1 px-3 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
-                            defaultValue={feature}
-                            onChange={(e) => {
-                              const updatedFeatures = [...pkg.features]
-                              updatedFeatures[featureIndex] = e.target.value
-                              const updatedPackages = [...packageOptions]
-                              updatedPackages[index].features = updatedFeatures
-                              // Force re-render
-                              setBookings([...bookings])
-                            }}
-                          />
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hall</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacity</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {hallsLoading && (
+                      <tr>
+                        <td className="px-6 py-6 text-sm text-gray-500" colSpan={5}>Loading your halls…</td>
+                      </tr>
+                    )}
+
+                    {!hallsLoading && myHalls.length === 0 && (
+                      <tr>
+                        <td className="px-6 py-6 text-sm text-gray-500" colSpan={5}>No halls yet. Create one from “Create Hall”.</td>
+                      </tr>
+                    )}
+
+                    {!hallsLoading && myHalls.map((h) => (
+                      <tr key={h.hallId} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <img
+                              src={firstImage(h.imageURLs)}
+                              alt={h.name}
+                              className="h-16 w-24 object-cover rounded border border-gray-200 mr-3"
+                            />
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">{h.name}</div>
+                              <div className="text-xs text-gray-500">{h.address?.city || h.address?.state || '—'}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{h.capacity}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{pkr(h.price)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                    ${h.status === "approved"
+                              ? "bg-green-100 text-green-800"
+                              : h.status === "pending"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-gray-100 text-gray-800"}`}>
+                            {h.status || '—'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                           <button
-                            className="ml-2 text-red-500 hover:text-red-700"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              const updatedPackages = [...packageOptions]
-                              updatedPackages[index].features = pkg.features.filter((_, i) => i !== featureIndex)
-                              // Force re-render
-                              setBookings([...bookings])
-                            }}
+                            className="mr-3 text-blue-600 hover:text-blue-800 font-medium"
+                            onClick={() => loadHallForEdit(h)}
                           >
-                            <XCircle className="h-4 w-4" />
+                            Edit
                           </button>
-                        </div>
-                      ))}
-                      <button
-                        className="mt-3 text-sm text-[#FF477E] hover:text-[#9D2235] font-medium"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          const updatedPackages = [...packageOptions]
-                          updatedPackages[index].features.push("New feature")
-                          // Force re-render
-                          setBookings([...bookings])
-                        }}
-                      >
-                        + Add Feature
-                      </button>
-                    </div>
-                  </div>
-                ))}
+
+                          <button
+                            className={`text-red-600 hover:text-red-800 font-medium ${deletingHallId === h.hallId ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            disabled={deletingHallId === h.hallId}
+                            onClick={() => handleDeleteHall(h)}
+                          >
+                            {deletingHallId === h.hallId ? 'Deleting…' : 'Delete'}
+                          </button>
+
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
         )}
+
+        {activeTab === "editHall" && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-800">
+                {loadingEdit ? 'Loading…' : `Edit Hall`}
+              </h2>
+              <div className="space-x-2">
+                <button
+                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+                  onClick={() => setActiveTab('myhalls')}
+                >
+                  Back to My Halls
+                </button>
+                <button
+                  className="px-4 py-2 bg-[#FF477E] text-white rounded-lg hover:bg-[#9D2235]"
+                  disabled={saving || loadingEdit || !editHallId}
+                  onClick={() => handleUpdate()}
+                >
+                  {saving ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+
+
+
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-medium text-gray-800">Hall Information</h3>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Hall Name</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
+                    <input
+                      type="email"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
+                   
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
+                    <input
+                      type="tel"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
+                      placeholder="+92 300 1234567"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Capacity</label>
+                    <input type="number" min={1}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E]"
+                      value={capacity}
+                      onChange={(e) => setCapacity(parseInt(e.target.value || "0"))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Base Price (PKR)</label>
+                    <input type="number" min={0}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E]"
+                      value={price}
+                      onChange={(e) => setPrice(parseFloat(e.target.value || "0"))}
+                    />
+                  </div>
+
+
+
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
+                      rows={4}
+                      onChange={(e) => setDescription(e.target.value)}
+                      value={description}
+                    ></textarea>
+                  </div>
+
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <label className="block text-xs text-gray-500 mb-1">Address Line</label>
+                        <input
+                          type="text"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
+                         value={addressLine}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">City</label>
+                        <select
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
+                          defaultValue="Lahore"
+                        >
+                          <option value="Karachi">Karachi</option>
+                          <option value="Lahore">Lahore</option>
+                          <option value="Islamabad">Islamabad</option>
+                          <option value="Rawalpindi">Rawalpindi</option>
+                          <option value="Faisalabad">Faisalabad</option>
+                          <option value="Multan">Multan</option>
+                          <option value="Peshawar">Peshawar</option>
+                          <option value="Quetta">Quetta</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">State/Province</label>
+                        <select
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
+                          defaultValue="Punjab"
+                        >
+                          <option value="Punjab">Punjab</option>
+                          <option value="Sindh">Sindh</option>
+                          <option value="Khyber Pakhtunkhwa">Khyber Pakhtunkhwa</option>
+                          <option value="Balochistan">Balochistan</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Postal Code</label>
+                        <input
+                          type="text"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
+                          defaultValue="54000"
+                          onChange={(e) => setPostalCode(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Country</label>
+                        <input
+                          type="text"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
+                          value="Pakistan"
+                          disabled
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-8 border-t border-gray-200 pt-6">
+                  <h4 className="text-lg font-medium text-gray-800 mb-4">Hall Amenities</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {amenities.map((amenity) => {
+                      const checked = selectedAmenities.includes(amenity.amenityId)
+                      return (
+                        <div key={amenity.amenityId} className="flex items-start space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`amenity-${amenity.amenityId}`}
+                            checked={checked}
+                            onChange={() => {
+                              setSelectedAmenities(checked
+                                ? selectedAmenities.filter(id => id !== amenity.amenityId)
+                                : [...selectedAmenities, amenity.amenityId])
+                            }}
+                            className="mt-1"
+                          />
+                          <label htmlFor={`amenity-${amenity.amenityId}`} className="text-sm">
+                            <div className="font-medium text-gray-800">{amenity.name}</div>
+                            <div className="text-xs text-gray-500">{amenity.description}</div>
+                          </label>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                </div>
+
+                <div className="mt-8 border-t border-gray-200 pt-6">
+                  <h4 className="text-lg font-medium text-gray-800 mb-4">Hall Images</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {hallImages.map((image, index) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={image || "/placeholder.svg"}
+                          alt={`Hall image ${index + 1}`}
+                          className="w-full h-48 object-cover rounded-lg border border-gray-200"
+                        />
+                        <button
+                          className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => removeImage(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+
+                    {hallImages.length < 5 && (
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center h-48 bg-gray-50">
+                        <label className="cursor-pointer flex flex-col items-center p-4">
+                          <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                          <span className="text-sm text-gray-500">Upload Image</span>
+                          <span className="text-xs text-gray-400 mt-1">({5 - hallImages.length} remaining)</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleImageUpload}
+                            multiple={5 - hallImages.length > 1}
+                          />
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Upload up to 5 images of your hall. Recommended size: 1200x800 pixels.
+                  </p>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
 
       {/* Booking Details Modal */}
@@ -1234,13 +1545,12 @@ const Dashboard = () => {
                   <p className="text-gray-800">
                     <span
                       className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                      ${
-                        selectedBooking.status === "approved"
+                      ${selectedBooking.status === "approved"
                           ? "bg-green-100 text-green-800"
                           : selectedBooking.status === "pending"
                             ? "bg-yellow-100 text-yellow-800"
                             : "bg-red-100 text-red-800"
-                      }`}
+                        }`}
                     >
                       {selectedBooking.status.charAt(0).toUpperCase() + selectedBooking.status.slice(1)}
                     </span>
@@ -1326,5 +1636,4 @@ const Dashboard = () => {
 }
 
 export default Dashboard
-
 

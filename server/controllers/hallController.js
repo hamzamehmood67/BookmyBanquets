@@ -1,8 +1,8 @@
 // const { PrismaClient } = require('@prisma/client');
-import { PrismaClient } from '@prisma/client';
+const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
-export const createHall = async (req, res) => {
+ const createHall = async (req, res) => {
   try {
     const { name, description, capacity, price, imageURLs, status, addressId, amenities } = req.body;
     const hall = await prisma.hall.create({
@@ -13,8 +13,8 @@ export const createHall = async (req, res) => {
         price,
         imageURLs: imageURLs.join(','),
         status,
-        userId: req.user.userId,
-        addressId,
+        user:    { connect: { userId: req.user.userId } },
+        address: { connect: { addressId } },
         amenities: {
           create: amenities.map(id => ({ amenityId: id }))
         }
@@ -26,30 +26,53 @@ export const createHall = async (req, res) => {
   }
 };
 
-export const updateHall = async (req, res) => {
+// controllers/hallController.js
+const updateHall = async (req, res) => {
   try {
-    const { imageURLs, amenities, ...rest } = req.body;
+    const { id } = req.params;
+    const { name, description, capacity, price, imageURLs, status, addressId, amenities } = req.body;
 
-    // Format the imageURLs
-    const formattedData = {
-      ...rest,
-      ...(imageURLs && { imageURLs: imageURLs.join(',') })
-    };
+    // validate hall exists & ownership is already checked by middleware
+    const exists = await prisma.hall.findUnique({ where: { hallId: id }, select: { hallId: true } });
+    if (!exists) return res.status(404).json({ error: 'Hall not found' });
 
-    // TODO: Update amenities properly (optional step shown below)
+    const imagesJoined = Array.isArray(imageURLs) ? imageURLs.join(',') : (imageURLs || '');
 
-    const updated = await prisma.hall.update({
-      where: { hallId: req.params.id },
-      data: formattedData
+    // transaction: reset amenities, then update hall
+    const hall = await prisma.$transaction(async (tx) => {
+      // wipe current amenity links
+      await tx.amenitiesHall.deleteMany({ where: { hallId: id } });
+
+      // update hall
+      const updated = await tx.hall.update({
+        where: { hallId: id },
+        data: {
+          name,
+          description,
+          capacity: Number(capacity) || 0,
+          price: Number(price) || 0,
+          imageURLs: imagesJoined,
+          status,                      // or keep previous if not sent
+          addressId,                   // keep linkage
+          amenities: {
+            create: (amenities || []).map((amenityId) => ({ amenityId }))
+          }
+        },
+        include: { address: true, amenities: true }
+      });
+
+      return updated;
     });
 
-    res.json({ status: 'success', data: updated, message: 'Hall updated successfully' });
+    return res.status(200).json({ hall, message: 'Hall updated successfully' });
   } catch (err) {
-    res.status(400).json({ error: 'Hall update failed', details: err.message });
+    console.error('updateHall error', err);
+    return res.status(500).json({ error: 'Error updating hall', details: err.message });
   }
 };
 
-export const deleteHall = async (req, res) => {
+
+ const deleteHall = async (req, res) => {
   const hallId = req.params.id;
 
   try {
@@ -86,8 +109,7 @@ export const deleteHall = async (req, res) => {
   }
 };
 
-export const getAllHalls = async (req, res) => {
-  console.log("Hello")
+ const getAllHalls = async (req, res) => {
   try {
     const halls = await prisma.hall.findMany({
       include: {
@@ -102,7 +124,43 @@ export const getAllHalls = async (req, res) => {
   }
 };
 
-export const getSingleHall = async (req, res) => {
+// controllers/hallController.js
+const listPublicHalls = async (req, res) => {
+  try {
+    const halls = await prisma.hall.findMany({
+      where: { status: "active" },
+      include: { address: true }
+    });
+
+    const aggs = await prisma.review.groupBy({
+      by: ["hallId"],
+      _avg: { rating: true },
+      _count: { rating: true }
+    });
+    const aggByHall = Object.fromEntries(aggs.map(a => [a.hallId, a]));
+
+    const venues = halls.map(h => {
+      const a = aggByHall[h.hallId];
+      return {
+        id: h.hallId,
+        name: h.name,
+        location: `${h.address?.city || ""}, ${h.address?.state || ""}`,
+        image: h.imageURLs,     // FE will pick first
+        price: h.price,
+        capacity: h.capacity,
+        rating: a ? Number((a._avg.rating || 0).toFixed(1)) : 0,
+        reviewCount: a ? a._count.rating : 0,
+        featured: false
+      };
+    });
+
+    res.status(200).json({ venues });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch halls", details: err.message });
+  }
+};
+
+ const getSingleHall = async (req, res) => {
   try {
     const hall = await prisma.hall.findUnique({
       where: { hallId: req.params.id },
@@ -119,7 +177,7 @@ export const getSingleHall = async (req, res) => {
   }
 };
 
-export const getHallAmenities = async (req, res) => {
+ const getHallAmenities = async (req, res) => {
   try {
     const amenities = await prisma.amenitiesHall.findMany({
       where: { hallId: req.params.id },
@@ -131,7 +189,7 @@ export const getHallAmenities = async (req, res) => {
   }
 };
 
-export const getHallBookings = async (req, res) => {
+ const getHallBookings = async (req, res) => {
   try {
     const bookings = await prisma.booking.findMany({ where: { hallId: req.params.id } });
     res.json(bookings);
@@ -140,7 +198,7 @@ export const getHallBookings = async (req, res) => {
   }
 };
 
-export const searchHalls = async (req, res) => {
+ const searchHalls = async (req, res) => {
   try {
     const { city, minPrice, maxPrice } = req.query;
     const halls = await prisma.hall.findMany({
@@ -161,7 +219,7 @@ export const searchHalls = async (req, res) => {
   }
 };
 
-export const checkAvailability = async (req, res) => {
+ const checkAvailability = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
 
@@ -207,7 +265,7 @@ export const checkAvailability = async (req, res) => {
   }
 };
 
-export const getHallReviews = async (req, res) => {
+ const getHallReviews = async (req, res) => {
   try {
     const reviews = await prisma.review.findMany({ where: { hallId: req.params.id } });
     res.json(reviews);
@@ -216,7 +274,7 @@ export const getHallReviews = async (req, res) => {
   }
 };
 
-export const postReview = async (req, res) => {
+ const postReview = async (req, res) => {
   try {
     const { rating, comment } = req.body;
     const hallId = req.params.id;
@@ -226,9 +284,9 @@ export const postReview = async (req, res) => {
       where: {
         userId,
         hallId,
-        status: 'approved', 
+        status: 'approved',
         endDate: {
-          lt: new Date() 
+          lt: new Date()
         }
       }
     });
@@ -264,7 +322,7 @@ export const postReview = async (req, res) => {
   }
 };
 
-export const getTopRatedHalls = async (req, res) => {
+ const getTopRatedHalls = async (req, res) => {
   try {
     const halls = await prisma.hall.findMany({
       include: {
@@ -282,7 +340,7 @@ export const getTopRatedHalls = async (req, res) => {
   }
 };
 
-export const getOwnedHalls = async (req, res) => {
+ const getOwnedHalls = async (req, res) => {
   try {
     const halls = await prisma.hall.findMany({
       where: { userId: req.user.userId },
@@ -292,4 +350,21 @@ export const getOwnedHalls = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch your halls' });
   }
+};
+
+module.exports = {
+  createHall,
+  updateHall,
+  deleteHall,
+  getAllHalls,
+  getSingleHall,
+  getHallAmenities,
+  getHallBookings,
+  searchHalls,
+  checkAvailability,
+  getHallReviews,
+  postReview,
+  getTopRatedHalls,
+  getOwnedHalls,
+  listPublicHalls
 };

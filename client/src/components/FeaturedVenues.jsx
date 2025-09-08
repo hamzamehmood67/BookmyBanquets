@@ -1,81 +1,75 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Slider from "react-slick";
 import { FiStar, FiMapPin, FiUsers, FiHeart, FiClock } from "react-icons/fi";
 import { motion } from "framer-motion";
+import axios from "axios";
+
+const API = "http://localhost:3000/api/v1";
+
+const firstImage = (imageURLs) => {
+  if (!imageURLs) return "/placeholder.svg?height=300&width=500";
+  if (Array.isArray(imageURLs)) return imageURLs[0] || "/placeholder.svg?height=300&width=500";
+  const first = String(imageURLs)
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)[0];
+  return first || "/placeholder.svg?height=300&width=500";
+};
+
+const pkr = (n) =>
+  new Intl.NumberFormat("en-PK", { style: "currency", currency: "PKR", maximumFractionDigits: 0 }).format(n || 0);
 
 const FeaturedVenues = () => {
   const [favoriteVenues, setFavoriteVenues] = useState([]);
+  const [venues, setVenues] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const toggleFavorite = (venueId) => {
-    if (favoriteVenues.includes(venueId)) {
-      setFavoriteVenues(favoriteVenues.filter((id) => id !== venueId));
-    } else {
-      setFavoriteVenues([...favoriteVenues, venueId]);
-    }
+    setFavoriteVenues((prev) =>
+      prev.includes(venueId) ? prev.filter((id) => id !== venueId) : [...prev, venueId]
+    );
   };
 
-  const venues = [
-    {
-      id: 1,
-      name: "The Grand Ballroom",
-      location: "Lahore",
-      image:
-        "https://images.pexels.com/photos/3201763/pexels-photo-3201763.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-      price: "PKR 5,000",
-      capacity: "300-500 guests",
-      rating: 4.9,
-      reviewCount: 124,
-      featured: true,
-    },
-    {
-      id: 2,
-      name: "Royal Gardens",
-      location: "Lahore",
-      image:
-        "https://images.pexels.com/photos/2291462/pexels-photo-2291462.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-      price: "PKR 4,500",
-      capacity: "200-350 guests",
-      rating: 4.8,
-      reviewCount: 98,
-      featured: true,
-    },
-    {
-      id: 3,
-      name: "Oceanview Terrace",
-      location: "Rawalpindi",
-      image:
-        "https://images.pexels.com/photos/1616113/pexels-photo-1616113.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-      price: "PKR 6,200",
-      capacity: "100-250 guests",
-      rating: 4.7,
-      reviewCount: 86,
-      featured: true,
-    },
-    {
-      id: 4,
-      name: "The Majestic",
-      location: "Karachi",
-      image:
-        "https://images.pexels.com/photos/260922/pexels-photo-260922.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-      price: "PKR 3,800",
-      capacity: "150-300 guests",
-      rating: 4.6,
-      reviewCount: 74,
-      featured: true,
-    },
-    {
-      id: 5,
-      name: "Crystal Palace",
-      location: "Lahore",
-      image:
-        "https://images.pexels.com/photos/3038424/pexels-photo-3038424.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2",
-      price: "PKR 7,500",
-      capacity: "400-800 guests",
-      rating: 4.9,
-      reviewCount: 156,
-      featured: true,
-    },
-  ];
+  useEffect(() => {
+    const load = async () => {
+      try {
+        // If your route name differs, adjust here (e.g. /hall/public/list)
+        const { data } = await axios.get(`${API}/hall`);
+
+        // Accept {venues:[...]} or {halls:[...]} or raw array
+        const rows = Array.isArray(data) ? data : (data?.venues ?? data?.halls ?? []);
+
+        // Sort newest first if backend provides createdAt; otherwise keep order
+        const sorted = [...rows].sort((a, b) => {
+          const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return db - da;
+        });
+
+        const latestFive = sorted.slice(0, 5);
+
+        const mapped = latestFive.map((h) => ({
+          id: h.id || h.hallId,
+          name: h.name,
+          location: h.location ?? (h.address ? `${h.address.city ?? ""}, ${h.address.state ?? ""}` : ""),
+          image: firstImage(h.image ?? h.imageURLs),
+          price: pkr(h.price),
+          capacity: `${h.capacity} guests`,
+          rating: Number(h.rating ?? 0),
+          reviewCount: Number(h.reviewCount ?? 0),
+          featured: true, // latest five are marked as featured
+        }));
+
+        setVenues(mapped);
+      } catch (e) {
+        console.error("Failed to load featured venues:", e);
+        setVenues([]); // empty state
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
 
   const sliderSettings = {
     dots: true,
@@ -84,18 +78,8 @@ const FeaturedVenues = () => {
     slidesToShow: 3,
     slidesToScroll: 1,
     responsive: [
-      {
-        breakpoint: 1024,
-        settings: {
-          slidesToShow: 2,
-        },
-      },
-      {
-        breakpoint: 640,
-        settings: {
-          slidesToShow: 1,
-        },
-      },
+      { breakpoint: 1024, settings: { slidesToShow: 2 } },
+      { breakpoint: 640, settings: { slidesToShow: 1 } },
     ],
   };
 
@@ -105,91 +89,81 @@ const FeaturedVenues = () => {
         <div className="text-center mb-12">
           <h2 className="section-title">Featured Banquet Halls</h2>
           <p className="section-subtitle mx-auto">
-            Discover our handpicked selection of the most exquisite banquet
-            halls and event spaces
+            Discover our handpicked selection of the latest and most exquisite venues
           </p>
         </div>
 
-        <Slider {...sliderSettings} className="featured-venues-slider">
-          {venues.map((venue) => (
-            <div key={venue.id} className="px-3 pb-6">
-              <motion.div
-                className="venue-card h-full"
-                whileHover={{ y: -5 }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className="relative">
-                  <img
-                    src={venue.image}
-                    alt={venue.name}
-                    className="w-full h-64 object-cover"
-                  />
-                  <button
-                    className="absolute top-4 right-4 p-2 bg-white rounded-full shadow-md hover:shadow-lg transition-all"
-                    onClick={() => toggleFavorite(venue.id)}
-                  >
-                    <FiHeart
-                      className={`h-5 w-5 ${
-                        favoriteVenues.includes(venue.id)
-                          ? "text-red-500 fill-red-500"
-                          : "text-gray-400"
-                      }`}
-                    />
-                  </button>
-                  {venue.featured && (
-                    <div className="absolute top-4 left-4 bg-gold-500 px-3 py-1 text-xs font-semibold text-white rounded-full">
-                      Featured
-                    </div>
-                  )}
-                </div>
-                <div className="p-6">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-xl font-semibold text-navy-800">
-                      {venue.name}
-                    </h3>
-                    <div className="flex items-center">
-                      <FiStar className="text-gold-500 mr-1" />
-                      <span className="text-sm font-medium">
-                        {venue.rating}
-                      </span>
-                      <span className="text-xs text-gray-500 ml-1">
-                        ({venue.reviewCount})
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center text-gray-500 mb-4">
-                    <FiMapPin className="mr-1" />
-                    <span className="text-sm">{venue.location}</span>
-                  </div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center text-navy-500">
-                      <FiUsers className="mr-1" />
-                      <span className="text-sm">{venue.capacity}</span>
-                    </div>
-                    <div className="flex items-center text-navy-500">
-                      <FiClock className="mr-1" />
-                      <span className="text-sm">Available Now</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center mt-4">
-                    <div className="text-navy-800">
-                      <span className="font-semibold text-lg">
-                        {venue.price}
-                      </span>
-                      <span className="text-gray-500 text-sm"> / day</span>
-                    </div>
-                    <a
-                      href={`/hall/${venue.id}`}
-                      className="btn-outline text-sm py-2"
+        {loading ? (
+          <div className="py-16 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-full border-4 border-gray-300 border-t-[#FF477E] animate-spin" />
+          </div>
+        ) : venues.length === 0 ? (
+          <div className="py-16 text-center text-gray-600">No featured venues available right now.</div>
+        ) : (
+          <Slider {...sliderSettings} className="featured-venues-slider">
+            {venues.map((venue) => (
+              <div key={venue.id} className="px-3 pb-6">
+                <motion.div className="venue-card h-full" whileHover={{ y: -5 }} transition={{ duration: 0.3 }}>
+                  <div className="relative">
+                    <img src={venue.image} alt={venue.name} className="w-full h-64 object-cover" />
+                    <button
+                      className="absolute top-4 right-4 p-2 bg-white rounded-full shadow-md hover:shadow-lg transition-all"
+                      onClick={() => toggleFavorite(venue.id)}
                     >
-                      View Details
-                    </a>
+                      <FiHeart
+                        className={`h-5 w-5 ${
+                          favoriteVenues.includes(venue.id) ? "text-red-500 fill-red-500" : "text-gray-400"
+                        }`}
+                      />
+                    </button>
+                    {venue.featured && (
+                      <div className="absolute top-4 left-4 bg-gold-500 px-3 py-1 text-xs font-semibold text-white rounded-full">
+                        Featured
+                      </div>
+                    )}
                   </div>
-                </div>
-              </motion.div>
-            </div>
-          ))}
-        </Slider>
+
+                  <div className="p-6">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="text-xl font-semibold text-navy-800">{venue.name}</h3>
+                      <div className="flex items-center">
+                        <FiStar className="text-gold-500 mr-1" />
+                        <span className="text-sm font-medium">{venue.rating}</span>
+                        <span className="text-xs text-gray-500 ml-1">({venue.reviewCount})</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center text-gray-500 mb-4">
+                      <FiMapPin className="mr-1" />
+                      <span className="text-sm">{venue.location}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center text-navy-500">
+                        <FiUsers className="mr-1" />
+                        <span className="text-sm">{venue.capacity}</span>
+                      </div>
+                      <div className="flex items-center text-navy-500">
+                        <FiClock className="mr-1" />
+                        <span className="text-sm">Available Now</span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center mt-4">
+                      <div className="text-navy-800">
+                        <span className="font-semibold text-lg">{venue.price}</span>
+                        <span className="text-gray-500 text-sm"> / day</span>
+                      </div>
+                      <a href={`/hall/${venue.id}`} className="btn-outline text-sm py-2">
+                        View Details
+                      </a>
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            ))}
+          </Slider>
+        )}
 
         <div className="text-center mt-12">
           <a href="venues" className="btn-primary">

@@ -1,8 +1,8 @@
-import { PrismaClient } from "@prisma/client";
+const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 // 📦 1. Create Booking
-export const createBooking = async (req, res) => {
+const createBooking = async (req, res) => {
   try {
     const {
       startDate,
@@ -35,7 +35,7 @@ export const createBooking = async (req, res) => {
 };
 
 // 📄 2. Get My Bookings (Customer)
-export const getMyBookings = async (req, res) => {
+const getMyBookings = async (req, res) => {
   try {
     const bookings = await prisma.booking.findMany({
       where: { userId: req.user.userId },
@@ -48,7 +48,7 @@ export const getMyBookings = async (req, res) => {
 };
 
 // ❌ 3. Cancel Booking (Customer)
-export const cancelBooking = async (req, res) => {
+const cancelBooking = async (req, res) => {
   try {
     const booking = await prisma.booking.findUnique({
       where: { bookingId: req.params.id }
@@ -66,7 +66,7 @@ export const cancelBooking = async (req, res) => {
 };
 
 // 🏢 4. Get Bookings By Hall (Manager)
-export const getBookingsByHallId = async (req, res) => {
+const getBookingsByHallId = async (req, res) => {
   try {
     const hall = await prisma.hall.findUnique({
       where: { hallId: req.params.hallId }
@@ -88,7 +88,7 @@ export const getBookingsByHallId = async (req, res) => {
 };
 
 // ✅ 5. Approve Booking (Manager)
-export const approveBooking = async (req, res) => {
+const approveBooking = async (req, res) => {
   try {
     const booking = await prisma.booking.findUnique({
       where: { bookingId: req.params.id },
@@ -111,7 +111,7 @@ export const approveBooking = async (req, res) => {
 };
 
 // ❌ 6. Reject Booking (Manager)
-export const rejectBooking = async (req, res) => {
+const rejectBooking = async (req, res) => {
   try {
     const booking = await prisma.booking.findUnique({
       where: { bookingId: req.params.id },
@@ -134,7 +134,7 @@ export const rejectBooking = async (req, res) => {
 };
 
 // 🛡 7. View All Bookings (Admin)
-export const getAllBookings = async (req, res) => {
+const getAllBookings = async (req, res) => {
   try {
     const bookings = await prisma.booking.findMany({
       include: { hall: true, user: true }
@@ -143,4 +143,14 @@ export const getAllBookings = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch bookings", details: err.message });
   }
+};
+
+module.exports = {
+  createBooking,
+  getMyBookings,
+  cancelBooking,
+  getBookingsByHallId,
+  approveBooking,
+  rejectBooking,
+  getAllBookings
 };

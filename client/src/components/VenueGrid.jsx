@@ -82,7 +82,7 @@ const VenueGrid = ({ venues = [] }) => {
                 <div className="flex justify-between items-center mt-4">
                   <div className="text-navy-800">
                     <span className="font-semibold text-lg">{venue.price}</span>
-                    <span className="text-gray-500 text-sm"> / day</span>
+                    <span className="text-gray-500 text-sm"></span>
                   </div>
                   <a
                     href={`/hall/${venue.id}`}
