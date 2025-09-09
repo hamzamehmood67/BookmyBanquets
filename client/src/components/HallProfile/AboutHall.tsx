@@ -1,6 +1,41 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+interface HallData {
+  hallId: string;
+  name: string;
+  description: string;
+  capacity: number;
+  price: number;
+  imageURLs: string;
+  status: string;
+  address: {
+    addressLine: string;
+    city: string;
+    state: string;
+    country: string;
+  };
+  amenities: Array<{
+    amenity: {
+      amenityId: string;
+      name: string;
+      description: string;
+    };
+  }>;
+  reviews: Array<{
+    reviewId: string;
+    rating: number;
+    comment: string;
+    user: {
+      name: string;
+    };
+  }>;
+}
+
+interface AboutHallProps {
+  hallData: HallData;
+}
 
 const faqs = [
   {
@@ -30,9 +65,9 @@ const faqs = [
   },
 ];
 
-const AboutHall: React.FC = () => {
+const AboutHall: React.FC<AboutHallProps> = ({ hallData }) => {
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
-
+  const navigate = useNavigate();
   const toggleFaq = (index: number) => {
     setExpandedFaq(expandedFaq === index ? null : index);
   };
@@ -53,7 +88,7 @@ const AboutHall: React.FC = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5 }}
-              className="text-sm font-medium text-[#FF477E] uppercase tracking-wider"
+              className="text-sm font-medium text-[#9D2235] uppercase tracking-wider"
             >
               About Us
             </motion.span>
@@ -64,7 +99,7 @@ const AboutHall: React.FC = () => {
               transition={{ duration: 0.5, delay: 0.1 }}
               className="mt-2 text-3xl font-serif font-bold text-gray-900"
             >
-              The Royal Palace Legacy
+              About {hallData.name}
             </motion.h2>
 
             <div className="mt-6 space-y-4 text-gray-700">
@@ -74,10 +109,7 @@ const AboutHall: React.FC = () => {
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: 0.2 }}
               >
-                Royal Palace Banquet Hall has been creating memorable
-                celebrations for over a decade. Established in 2010, our venue
-                has hosted more than 3,000 successful events including glamorous
-                weddings, corporate galas, and milestone celebrations.
+                {hallData.description || `${hallData.name} has been creating memorable celebrations for years. Our venue has hosted numerous successful events including glamorous weddings, corporate galas, and milestone celebrations.`}
               </motion.p>
 
               <motion.p
@@ -86,12 +118,7 @@ const AboutHall: React.FC = () => {
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: 0.3 }}
               >
-                Our 10,000 square foot main hall features soaring 20-foot
-                ceilings, grand crystal chandeliers, and a state-of-the-art
-                lighting system that can transform the space to match any theme
-                or color palette. The adjacent 2,500 square foot pre-function
-                area provides the perfect setting for cocktail hours or smaller
-                gatherings.
+                Our spacious hall can accommodate up to {hallData.capacity} guests with elegant interiors and state-of-the-art facilities. Located in {hallData.address.city}, {hallData.address.state}, we provide the perfect setting for your special occasions with premium amenities and professional service.
               </motion.p>
 
               <motion.p
@@ -100,11 +127,7 @@ const AboutHall: React.FC = () => {
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: 0.4 }}
               >
-                At Royal Palace, we pride ourselves on our attention to detail
-                and personalized service. Our team of experienced event
-                professionals works closely with each client to ensure their
-                vision becomes reality, handling everything from initial
-                planning to day-of coordination.
+                At {hallData.name}, we pride ourselves on our attention to detail and personalized service. Our team of experienced event professionals works closely with each client to ensure their vision becomes reality, handling everything from initial planning to day-of coordination.
               </motion.p>
             </div>
 
@@ -116,18 +139,18 @@ const AboutHall: React.FC = () => {
               className="mt-8 flex flex-wrap gap-4"
             >
               <div className="p-4 bg-[#9D2235]/10 rounded-lg">
-                <div className="font-bold text-xl text-[#FF477E]">12+</div>
-                <div className="text-sm text-gray-700">Years of Excellence</div>
+                <div className="font-bold text-xl text-[#9D2235]">{hallData.capacity}</div>
+                <div className="text-sm text-gray-700">Max Capacity</div>
               </div>
 
               <div className="p-4 bg-[#9D2235]/10 rounded-lg">
-                <div className="font-bold text-xl text-[#FF477E]">3,000+</div>
-                <div className="text-sm text-gray-700">Events Hosted</div>
+                <div className="font-bold text-xl text-[#9D2235]">{hallData.amenities?.length || 0}+</div>
+                <div className="text-sm text-gray-700">Amenities</div>
               </div>
 
               <div className="p-4 bg-[#9D2235]/10 rounded-lg">
-                <div className="font-bold text-xl text-[#FF477E]">98%</div>
-                <div className="text-sm text-gray-700">Client Satisfaction</div>
+                <div className="font-bold text-xl text-[#9D2235]">{hallData.reviews?.length || 0}</div>
+                <div className="text-sm text-gray-700">Reviews</div>
               </div>
             </motion.div>
           </div>
@@ -139,7 +162,7 @@ const AboutHall: React.FC = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5 }}
-              className="text-sm font-medium text-[#FF477E] uppercase tracking-wider"
+              className="text-sm font-medium text-[#9D2235] uppercase tracking-wider"
             >
               FAQs
             </motion.span>
@@ -206,7 +229,7 @@ const AboutHall: React.FC = () => {
                 Contact our event planning team for personalized assistance with
                 any queries you may have about our venue or services.
               </p>
-              <button className="mt-4 px-4 py-2 bg-[#FF477E] text-white rounded-lg text-sm font-medium hover:bg-[#8a1e2f] transition-colors">
+              <button onClick={() => navigate('/contact')} className="mt-4 px-4 py-2 bg-[#9D2235] text-white rounded-lg text-sm font-medium hover:bg-[#8a1e2f] transition-colors">
                 Contact Us
               </button>
             </motion.div>

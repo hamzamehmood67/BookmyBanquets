@@ -3,6 +3,41 @@ import { motion } from "framer-motion";
 import { format, addDays, isWeekend } from "date-fns";
 import { Calendar, CheckCircle, Users, Clock, AlertCircle } from "lucide-react";
 
+interface HallData {
+  hallId: string;
+  name: string;
+  description: string;
+  capacity: number;
+  price: number;
+  imageURLs: string;
+  status: string;
+  address: {
+    addressLine: string;
+    city: string;
+    state: string;
+    country: string;
+  };
+  amenities: Array<{
+    amenity: {
+      amenityId: string;
+      name: string;
+      description: string;
+    };
+  }>;
+  reviews: Array<{
+    reviewId: string;
+    rating: number;
+    comment: string;
+    user: {
+      name: string;
+    };
+  }>;
+}
+
+interface BookingSectionProps {
+  hallData: HallData;
+}
+
 // Mock data for available dates
 const unavailableDates = [
   new Date(2025, 5, 15), // June 15, 2025
@@ -23,16 +58,17 @@ const timeSlots = [
   { id: "evening", label: "Evening (7:30 PM - 11:30 PM)", available: false },
 ];
 
-const packageOptions = [
+// Generate package options based on hall data
+const generatePackageOptions = (hallData: HallData) => [
   {
     id: "basic",
     name: "Essential Package",
-    price: " PKR125,000",
+    price: `PKR ${Math.round(hallData.price * 0.8 / 1000)}K`,
     features: [
       "Hall rental for 4 hours",
       "Basic decor setup",
       "Sound system",
-      "Tables and chairs for up to 200 guests",
+      `Tables and chairs for up to ${Math.round(hallData.capacity * 0.6)} guests`,
       "Basic lighting setup",
       "Parking for 100 vehicles",
     ],
@@ -40,43 +76,44 @@ const packageOptions = [
   {
     id: "premium",
     name: "Premium Package",
-    price: "PKR 225,000",
+    price: `PKR ${Math.round(hallData.price / 1000)}K`,
     features: [
       "Hall rental for 6 hours",
       "Premium decor with floral arrangements",
       "Sound system with DJ",
-      "Tables and chairs for up to 300 guests",
+      `Tables and chairs for up to ${Math.round(hallData.capacity * 0.8)} guests`,
       "Advanced lighting with custom colors",
       "Valet parking for 150 vehicles",
-      "Basic food menu for 300 guests",
+      `Basic food menu for ${Math.round(hallData.capacity * 0.8)} guests`,
     ],
   },
   {
     id: "luxury",
     name: "Royal Package",
-    price: "PKR 350,000",
+    price: `PKR ${Math.round(hallData.price * 1.4 / 1000)}K`,
     features: [
       "Hall rental for 8 hours",
       "Luxury decor with premium flowers",
       "Professional sound system with DJ and MC",
-      "Premium seating for up to 500 guests",
+      `Premium seating for up to ${hallData.capacity} guests`,
       "Premium lighting with special effects",
       "Valet parking for 200 vehicles",
-      "Premium food menu for 500 guests",
+      `Premium food menu for ${hallData.capacity} guests`,
       "Complimentary honeymoon suite",
       "Photography and videography",
     ],
   },
 ];
 
-const BookingSection: React.FC = () => {
+const BookingSection: React.FC<BookingSectionProps> = ({ hallData }) => {
   const today = new Date();
   const maxDate = addDays(today, 365); // Allow bookings up to 1 year in advance
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
-  const [guestCount, setGuestCount] = useState<string>("100-200");
+  const [guestCount, setGuestCount] = useState<string>(`100-${Math.min(200, hallData.capacity)}`);
+  const packageOptions = generatePackageOptions(hallData);
   const [contactInfo, setContactInfo] = useState({
     name: "",
     email: "",
@@ -201,8 +238,7 @@ const BookingSection: React.FC = () => {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="mt-2 text-white/90"
           >
-            Check availability and reserve your date at Royal Palace Banquet
-            Hall
+            Check availability and reserve your date at {hallData.name}
           </motion.p>
         </div>
 
@@ -490,10 +526,10 @@ const BookingSection: React.FC = () => {
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
                         >
                           <option value="50-100">50-100 guests</option>
-                          <option value="100-200">100-200 guests</option>
-                          <option value="200-300">200-300 guests</option>
-                          <option value="300-400">300-400 guests</option>
-                          <option value="400-500">400-500 guests</option>
+                          <option value={`100-${Math.min(200, hallData.capacity)}`}>100-{Math.min(200, hallData.capacity)} guests</option>
+                          {hallData.capacity > 200 && <option value={`200-${Math.min(300, hallData.capacity)}`}>200-{Math.min(300, hallData.capacity)} guests</option>}
+                          {hallData.capacity > 300 && <option value={`300-${Math.min(400, hallData.capacity)}`}>300-{Math.min(400, hallData.capacity)} guests</option>}
+                          {hallData.capacity > 400 && <option value={`400-${hallData.capacity}`}>400-{hallData.capacity} guests</option>}
                         </select>
                       </div>
                     </div>
