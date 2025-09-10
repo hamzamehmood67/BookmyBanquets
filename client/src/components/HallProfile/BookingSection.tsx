@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { format, addDays, isWeekend } from "date-fns";
 import { Calendar, CheckCircle, Users, Clock, AlertCircle } from "lucide-react";
+import axios from "axios";
+import { useAuth } from "../../context/AuthContext";
 
 interface HallData {
   hallId: string;
@@ -51,69 +53,52 @@ const unavailableDates = [
   new Date(2025, 6, 13),
 ];
 
-// Available time slots
-const timeSlots = [
+// Default time slots (will be updated from backend)
+const defaultTimeSlots = [
   { id: "morning", label: "Morning (10:00 AM - 2:00 PM)", available: true },
   { id: "afternoon", label: "Afternoon (3:00 PM - 7:00 PM)", available: true },
-  { id: "evening", label: "Evening (7:30 PM - 11:30 PM)", available: false },
+  { id: "evening", label: "Evening (7:30 PM - 11:30 PM)", available: true },
 ];
 
-// Generate package options based on hall data
-const generatePackageOptions = (hallData: HallData) => [
-  {
-    id: "basic",
-    name: "Essential Package",
-    price: `PKR ${Math.round(hallData.price * 0.8 / 1000)}K`,
-    features: [
-      "Hall rental for 4 hours",
-      "Basic decor setup",
-      "Sound system",
-      `Tables and chairs for up to ${Math.round(hallData.capacity * 0.6)} guests`,
-      "Basic lighting setup",
-      "Parking for 100 vehicles",
-    ],
-  },
-  {
-    id: "premium",
-    name: "Premium Package",
-    price: `PKR ${Math.round(hallData.price / 1000)}K`,
-    features: [
-      "Hall rental for 6 hours",
-      "Premium decor with floral arrangements",
-      "Sound system with DJ",
-      `Tables and chairs for up to ${Math.round(hallData.capacity * 0.8)} guests`,
-      "Advanced lighting with custom colors",
-      "Valet parking for 150 vehicles",
-      `Basic food menu for ${Math.round(hallData.capacity * 0.8)} guests`,
-    ],
-  },
-  {
-    id: "luxury",
-    name: "Royal Package",
-    price: `PKR ${Math.round(hallData.price * 1.4 / 1000)}K`,
-    features: [
-      "Hall rental for 8 hours",
-      "Luxury decor with premium flowers",
-      "Professional sound system with DJ and MC",
-      `Premium seating for up to ${hallData.capacity} guests`,
-      "Premium lighting with special effects",
-      "Valet parking for 200 vehicles",
-      `Premium food menu for ${hallData.capacity} guests`,
-      "Complimentary honeymoon suite",
-      "Photography and videography",
-    ],
-  },
-];
+// Define time slot options with pricing
+const getTimeSlotDetails = (slotId: string, basePrice: number) => {
+  const slots = {
+    morning: {
+      label: "Morning (10:00 AM - 2:00 PM)",
+      duration: 4,
+      priceMultiplier: 0.8
+    },
+    afternoon: {
+      label: "Afternoon (3:00 PM - 7:00 PM)", 
+      duration: 4,
+      priceMultiplier: 1.0
+    },
+    evening: {
+      label: "Evening (7:30 PM - 11:30 PM)",
+      duration: 4,
+      priceMultiplier: 1.2
+    }
+  };
+  
+  const slot = slots[slotId as keyof typeof slots];
+  return {
+    ...slot,
+    price: Math.round(basePrice * slot.priceMultiplier)
+  };
+};
 
 const BookingSection: React.FC<BookingSectionProps> = ({ hallData }) => {
+  const { user } = useAuth();
   const today = new Date();
   const maxDate = addDays(today, 365); // Allow bookings up to 1 year in advance
+  const API = 'http://localhost:3000/api/v1';
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
-  const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
-  const [guestCount, setGuestCount] = useState<string>(`100-${Math.min(200, hallData.capacity)}`);
-  const packageOptions = generatePackageOptions(hallData);
+  const [guestCount, setGuestCount] = useState<number>(0);
+  const [timeSlots, setTimeSlots] = useState(defaultTimeSlots);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [contactInfo, setContactInfo] = useState({
     name: "",
     email: "",
@@ -122,6 +107,45 @@ const BookingSection: React.FC<BookingSectionProps> = ({ hallData }) => {
     specialRequests: "",
   });
   const [formStep, setFormStep] = useState(1);
+
+  // Check available time slots when date is selected
+  useEffect(() => {
+    if (selectedDate) {
+      checkAvailability(selectedDate);
+    }
+  }, [selectedDate]);
+
+  const checkAvailability = async (date: Date) => {
+    setLoading(true);
+    try {
+      const dateString = format(date, 'yyyy-MM-dd');
+      const response = await axios.get(`${API}/booking/availability`, {
+        params: {
+          hallId: hallData.hallId,
+          date: dateString
+        }
+      });
+      
+      if (response.data.status === 'success') {
+        setTimeSlots(response.data.availableTimeSlots);
+        // Reset selected time slot if it's no longer available
+        if (selectedTimeSlot) {
+          const selectedSlotAvailable = response.data.availableTimeSlots.find(
+            (slot: any) => slot.id === selectedTimeSlot
+          )?.available;
+          if (!selectedSlotAvailable) {
+            setSelectedTimeSlot(null);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking availability:', error);
+      // Fallback to default time slots
+      setTimeSlots(defaultTimeSlots);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const isDateUnavailable = (date: Date): boolean => {
     return unavailableDates.some(
@@ -183,23 +207,82 @@ const BookingSection: React.FC<BookingSectionProps> = ({ hallData }) => {
     setContactInfo((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleGuestCountChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setGuestCount(e.target.value);
+  const handleGuestCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setGuestCount(parseInt(e.target.value) || 0);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Here you would handle the form submission to your backend
-    console.log({
-      date: selectedDate,
-      timeSlot: selectedTimeSlot,
-      packageOption: selectedPackage,
-      guestCount,
-      ...contactInfo,
-    });
+    
+    if (!selectedDate || !selectedTimeSlot) {
+      alert('Please select date and time slot');
+      return;
+    }
 
-    // Move to confirmation step
-    setFormStep(3);
+    if (!user) {
+      alert('Please login to make a booking');
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const timeSlotDetails = getTimeSlotDetails(selectedTimeSlot, hallData.price);
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        alert('Please login to make a booking');
+        return;
+      }
+
+      const bookingData = {
+        hallId: hallData.hallId,
+        startDate: selectedDate.toISOString(),
+        endDate: selectedDate.toISOString(),
+        timeSlot: selectedTimeSlot,
+        timeSlotLabel: timeSlotDetails.label,
+        duration: timeSlotDetails.duration,
+        price: timeSlotDetails.price,
+        guests: guestCount,
+        bookingDetails: JSON.stringify({
+          eventType: contactInfo.eventType,
+          specialRequests: contactInfo.specialRequests,
+          contactName: contactInfo.name,
+          contactEmail: contactInfo.email,
+          contactPhone: contactInfo.phone,
+          timeSlot: selectedTimeSlot,
+          timeSlotLabel: timeSlotDetails.label
+        }),
+        days: 1
+      };
+
+      console.log('Booking data to be sent:', bookingData);
+      
+      const response = await axios.post(`${API}/booking`, bookingData, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data.status === 'success') {
+        console.log('Booking created:', response.data);
+        setFormStep(3);
+      }
+    } catch (error: any) {
+      console.error('Booking failed:', error);
+      
+      let errorMessage = 'Failed to create booking. Please try again.';
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+      
+      alert(errorMessage);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleNextStep = () => {
@@ -322,11 +405,24 @@ const BookingSection: React.FC<BookingSectionProps> = ({ hallData }) => {
               {selectedDate && (
                 <div className="mb-8">
                   <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                    <Clock className="h-5 w-5 text-[#FF477E] mr-2" />
+                    <Clock className="h-5 w-5 text-[#9D2235] mr-2" />
                     Select Time Slot
+                    {loading && (
+                      <div className="ml-2 w-4 h-4 border-2 border-[#9D2235] border-t-transparent rounded-full animate-spin"></div>
+                    )}
                   </h3>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {loading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="p-4 rounded-lg border border-gray-200 bg-gray-50 animate-pulse">
+                          <div className="h-4 bg-gray-300 rounded mb-2"></div>
+                          <div className="h-3 bg-gray-200 rounded"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {timeSlots.map((slot) => (
                       <div
                         key={slot.id}
@@ -372,7 +468,8 @@ const BookingSection: React.FC<BookingSectionProps> = ({ hallData }) => {
                         )}
                       </div>
                     ))}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -425,11 +522,40 @@ const BookingSection: React.FC<BookingSectionProps> = ({ hallData }) => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                      Contact Information
-                    </h3>
+                {/* Booking Summary */}
+                <div className="mb-6">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-4">
+                    Booking Summary
+                  </h3>
+                  <div className="bg-[#9D2235]/5 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <span className="text-sm text-gray-600">Date:</span>
+                        <p className="font-medium">{selectedDate && format(selectedDate, "MMMM d, yyyy")}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-600">Time:</span>
+                        <p className="font-medium">{timeSlots.find(slot => slot.id === selectedTimeSlot)?.label}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-600">Duration:</span>
+                        <p className="font-medium">{selectedTimeSlot ? getTimeSlotDetails(selectedTimeSlot, hallData.price).duration : 0} hours</p>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-600">Price:</span>
+                        <p className="font-medium text-[#9D2235]">
+                          PKR {selectedTimeSlot ? getTimeSlotDetails(selectedTimeSlot, hallData.price).price.toLocaleString() : hallData.price.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-8">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-4">
+                    Contact Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
                     <div className="space-y-4">
                       <div>
@@ -517,84 +643,40 @@ const BookingSection: React.FC<BookingSectionProps> = ({ hallData }) => {
                         >
                           Expected Guest Count *
                         </label>
-                        <select
+                        <input
+                          type="number"
                           id="guestCount"
                           name="guestCount"
                           value={guestCount}
                           onChange={handleGuestCountChange}
+                          min="1"
+                          max={hallData.capacity}
                           required
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
-                        >
-                          <option value="50-100">50-100 guests</option>
-                          <option value={`100-${Math.min(200, hallData.capacity)}`}>100-{Math.min(200, hallData.capacity)} guests</option>
-                          {hallData.capacity > 200 && <option value={`200-${Math.min(300, hallData.capacity)}`}>200-{Math.min(300, hallData.capacity)} guests</option>}
-                          {hallData.capacity > 300 && <option value={`300-${Math.min(400, hallData.capacity)}`}>300-{Math.min(400, hallData.capacity)} guests</option>}
-                          {hallData.capacity > 400 && <option value={`400-${hallData.capacity}`}>400-{hallData.capacity} guests</option>}
-                        </select>
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9D2235] focus:border-transparent"
+                          placeholder={`Enter number of guests (max: ${hallData.capacity})`}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Maximum capacity: {hallData.capacity} guests
+                        </p>
                       </div>
-                    </div>
                   </div>
-
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                      Select Package
-                    </h3>
-
-                    <div className="space-y-4">
-                      {packageOptions.map((pkg) => (
-                        <div
-                          key={pkg.id}
-                          onClick={() => setSelectedPackage(pkg.id)}
-                          className={`
-                            border rounded-lg p-4 cursor-pointer transition-all
-                            ${
-                              selectedPackage === pkg.id
-                                ? "border-[#FF477E] bg-[#9D2235]/5"
-                                : "border-gray-200 hover:border-gray-300"
-                            }
-                          `}
-                        >
-                          <div className="flex justify-between">
-                            <h4 className="font-semibold text-gray-800">
-                              {pkg.name}
-                            </h4>
-                            <span className="font-medium text-[#FF477E]">
-                              {pkg.price}
-                            </span>
-                          </div>
-
-                          <ul className="mt-3 space-y-1">
-                            {pkg.features.map((feature, index) => (
-                              <li
-                                key={index}
-                                className="flex items-start text-sm text-gray-600"
-                              >
-                                <CheckCircle className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                                <span>{feature}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="mt-6">
-                      <label
-                        htmlFor="specialRequests"
-                        className="block text-sm font-medium text-gray-700 mb-1"
-                      >
-                        Special Requests or Notes
-                      </label>
-                      <textarea
-                        id="specialRequests"
-                        name="specialRequests"
-                        value={contactInfo.specialRequests}
-                        onChange={handleInputChange}
-                        rows={3}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF477E] focus:border-transparent"
-                        placeholder="Any specific requirements or additional information we should know?"
-                      ></textarea>
-                    </div>
+                  
+                  <div className="mt-6">
+                    <label
+                      htmlFor="specialRequests"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
+                      Special Requests or Notes
+                    </label>
+                    <textarea
+                      id="specialRequests"
+                      name="specialRequests"
+                      value={contactInfo.specialRequests}
+                      onChange={handleInputChange}
+                      rows={4}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9D2235] focus:border-transparent"
+                      placeholder="Any specific requirements or additional information we should know?"
+                    ></textarea>
                   </div>
                 </div>
 
@@ -622,29 +704,37 @@ const BookingSection: React.FC<BookingSectionProps> = ({ hallData }) => {
                   </button>
 
                   <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    whileHover={{ scale: submitting ? 1 : 1.02 }}
+                    whileTap={{ scale: submitting ? 1 : 0.98 }}
                     type="submit"
                     disabled={
+                      submitting ||
                       !contactInfo.name ||
                       !contactInfo.email ||
                       !contactInfo.phone ||
-                      !selectedPackage
+                      guestCount < 1 ||
+                      guestCount > hallData.capacity
                     }
                     className={`
-                      px-6 py-3 rounded-lg font-medium 
+                      px-6 py-3 rounded-lg font-medium flex items-center gap-2
                       ${
+                        submitting ||
                         !contactInfo.name ||
                         !contactInfo.email ||
                         !contactInfo.phone ||
-                        !selectedPackage
+                        guestCount < 1 ||
+                        guestCount > hallData.capacity
                           ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                          : "bg-[#FF477E] text-white"
+                          : "bg-[#9D2235] text-white hover:bg-[#8a1e2f]"
                       }
                     `}
                   >
-                    Submit Booking Request
+                    {submitting && (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    )}
+                    {submitting ? 'Submitting...' : 'Submit Booking Request'}
                   </motion.button>
+                </div>
                 </div>
               </form>
             </motion.div>
@@ -695,19 +785,27 @@ const BookingSection: React.FC<BookingSectionProps> = ({ hallData }) => {
                     </div>
 
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Package:</span>
+                      <span className="text-gray-600">Duration:</span>
                       <span className="font-medium">
-                        {
-                          packageOptions.find(
-                            (pkg) => pkg.id === selectedPackage
-                          )?.name
-                        }
+                        {selectedTimeSlot ? getTimeSlotDetails(selectedTimeSlot, hallData.price).duration : 0} hours
                       </span>
                     </div>
 
                     <div className="flex justify-between">
                       <span className="text-gray-600">Guest Count:</span>
                       <span className="font-medium">{guestCount} guests</span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Event Type:</span>
+                      <span className="font-medium capitalize">{contactInfo.eventType}</span>
+                    </div>
+
+                    <div className="border-t border-gray-200 pt-3 flex justify-between">
+                      <span className="text-gray-600">Total Price:</span>
+                      <span className="font-bold text-[#9D2235]">
+                        PKR {selectedTimeSlot ? getTimeSlotDetails(selectedTimeSlot, hallData.price).price.toLocaleString() : hallData.price.toLocaleString()}
+                      </span>
                     </div>
 
                     <div className="border-t border-gray-200 pt-3 flex justify-between">
@@ -735,7 +833,7 @@ const BookingSection: React.FC<BookingSectionProps> = ({ hallData }) => {
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="px-6 py-3 bg-[#FF477E] rounded-lg font-medium text-white"
+                    className="px-6 py-3 bg-[#9D2235] rounded-lg font-medium text-white"
                   >
                     Contact Support
                   </motion.button>

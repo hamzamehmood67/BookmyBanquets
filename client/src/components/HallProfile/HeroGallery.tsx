@@ -191,7 +191,7 @@ const HeroGallery: React.FC<HeroGalleryProps> = ({ hallData }) => {
                 href="#booking"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-8 py-3 rounded-full bg-[#9D2235] text-white font-medium text-lg transition-all hover:bg-[#8a1e2f]"
+                className="px-8 py-3 rounded-full bg-[#FF477E] text-white font-medium text-lg transition-all hover:bg-[#8a1e2f]"
               >
                 Book Now
               </motion.a>

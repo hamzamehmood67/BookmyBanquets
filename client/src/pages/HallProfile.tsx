@@ -7,6 +7,7 @@ import HallHighlights from '../components/HallProfile/HallHighlights';
 import AboutHall from '../components/HallProfile/AboutHall';
 import Testimonials from '../components/HallProfile/Testimonials';
 import BookingSection from '../components/HallProfile/BookingSection';
+import ChatModal from '../components/ChatModal';
 import { motion } from 'framer-motion';
 import Loader from '../components/Loader';
 import { useAuth } from '../context/AuthContext';
@@ -48,6 +49,7 @@ const HallProfile: React.FC = () => {
   const [hallData, setHallData] = useState<HallData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
 
   const API = 'http://localhost:3000/api/v1';
 
@@ -135,6 +137,39 @@ const HallProfile: React.FC = () => {
             </div>
           )}
           
+          {/* Contact Manager section for customers */}
+          {isCustomer && (
+            <div className="my-12">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6 }}
+                className="bg-gradient-to-r from-[#9D2235]/10 to-[#FF477E]/10 rounded-2xl p-8 border border-[#9D2235]/20"
+              >
+                <div className="text-center">
+                  <h3 className="text-2xl font-serif font-bold text-gray-900 mb-3">
+                    Have Questions?
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    Chat directly with the hall manager to discuss your requirements, ask questions, or get personalized assistance.
+                  </p>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="inline-flex items-center px-6 py-3 bg-[#FF477E] text-white rounded-full font-medium hover:bg-[#8a1e2f] transition-all shadow-lg"
+                    onClick={() => setIsChatModalOpen(true)}
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    Contact Manager
+                  </motion.button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+          
           {/* Show message for non-customers */}
           {user && !isCustomer && (
             <div className="my-16">
@@ -197,6 +232,13 @@ const HallProfile: React.FC = () => {
           )}
         </motion.div>
       </main>
+
+      {/* Chat Modal */}
+      <ChatModal
+        isOpen={isChatModalOpen}
+        onClose={() => setIsChatModalOpen(false)}
+        hallData={hallData}
+      />
     </motion.div>
   );
 };

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Star, Quote, ChevronLeft, ChevronRight } from "lucide-react";
+import { Star, Quote, ChevronLeft, ChevronRight, Edit3, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import axios from "axios";
 
 interface HallData {
   hallId: string;
@@ -75,8 +76,47 @@ const Testimonials: React.FC<TestimonialsProps> = ({ hallData }) => {
   const [autoplay, setAutoplay] = useState(true);
   const [testimonials, setTestimonials] = useState(fallbackTestimonials);
   
+  // Review modal state
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewData, setReviewData] = useState({
+    rating: 0,
+    comment: ''
+  });
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+  
   // Check if user is a customer
   const isCustomer = user?.role === 'customer';
+  
+  const API = 'http://localhost:3000/api/v1';
+
+  // Function to fetch latest reviews
+  const fetchReviews = async () => {
+    try {
+      const response = await axios.get(`${API}/hall/${hallData.hallId}/reviews`);
+      const reviews = response.data?.data || response.data || [];
+      
+      if (reviews.length > 0) {
+        const processedReviews = reviews.map((review: any, index: number) => ({
+          id: review.reviewId || index + 1,
+          name: review.user?.name || "Anonymous Customer",
+          date: "Recent", // Since we don't have date in review schema
+          event: "Verified Customer", // Since we don't have event type in review schema
+          rating: review.rating,
+          image: `https://images.pexels.com/photos/${3760511 + index}/pexels-photo-${3760511 + index}.jpeg?auto=compress&cs=tinysrgb&w=120`, // Generate placeholder images
+          text: review.comment,
+        }));
+        setTestimonials(processedReviews);
+      } else {
+        // Use fallback testimonials if no reviews
+        setTestimonials(fallbackTestimonials);
+      }
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+      // Use fallback testimonials on error
+      setTestimonials(fallbackTestimonials);
+    }
+  };
 
   useEffect(() => {
     // Process reviews from backend
@@ -85,14 +125,17 @@ const Testimonials: React.FC<TestimonialsProps> = ({ hallData }) => {
         id: index + 1,
         name: review.user?.name || "Anonymous Customer",
         date: "Recent", // Since we don't have date in review schema
-        event: "Event", // Since we don't have event type in review schema
+        event: "Verified Customer", // Since we don't have event type in review schema
         rating: review.rating,
         image: `https://images.pexels.com/photos/${3760511 + index}/pexels-photo-${3760511 + index}.jpeg?auto=compress&cs=tinysrgb&w=120`, // Generate placeholder images
         text: review.comment,
       }));
       setTestimonials(processedReviews);
+    } else {
+      // Fetch reviews separately if not included in hall data
+      fetchReviews();
     }
-  }, [hallData.reviews]);
+  }, [hallData.reviews, hallData.hallId]);
 
   const nextTestimonial = () => {
     setActiveIndex((prevIndex) =>
@@ -104,6 +147,90 @@ const Testimonials: React.FC<TestimonialsProps> = ({ hallData }) => {
     setActiveIndex((prevIndex) =>
       prevIndex === 0 ? testimonials.length - 1 : prevIndex - 1
     );
+  };
+
+  const openReviewModal = () => {
+    setIsReviewModalOpen(true);
+    setReviewData({ rating: 0, comment: '' });
+    setReviewError('');
+  };
+
+  const closeReviewModal = () => {
+    setIsReviewModalOpen(false);
+    setReviewData({ rating: 0, comment: '' });
+    setReviewError('');
+  };
+
+  const handleRatingClick = (rating: number) => {
+    setReviewData(prev => ({ ...prev, rating }));
+  };
+
+  const handleReviewSubmit = async () => {
+    if (!user) {
+      setReviewError('You must be logged in to submit a review');
+      return;
+    }
+
+    if (reviewData.rating === 0) {
+      setReviewError('Please select a rating');
+      return;
+    }
+
+    if (!reviewData.comment.trim()) {
+      setReviewError('Please write a comment');
+      return;
+    }
+
+    setIsSubmittingReview(true);
+    setReviewError('');
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setReviewError('Authentication required. Please log in again.');
+        return;
+      }
+
+      const response = await axios.post(
+        `${API}/hall/${hallData.hallId}/review`,
+        {
+          rating: reviewData.rating,
+          comment: reviewData.comment.trim()
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.status === 200) {
+        // Success - close modal and refresh reviews
+        closeReviewModal();
+        
+        // Refresh reviews to show the new review
+        await fetchReviews();
+        
+        // Show success message (you might want to add a toast notification here)
+        console.log('Review submitted successfully!');
+      }
+    } catch (error: any) {
+      console.error('Error submitting review:', error);
+      
+      if (error.response?.status === 403) {
+        setReviewError('You must book this hall to leave a review');
+      } else if (error.response?.status === 401) {
+        setReviewError('Authentication required. Please log in again.');
+      } else {
+        setReviewError(
+          error.response?.data?.message || 
+          'Failed to submit review. Please try again.'
+        );
+      }
+    } finally {
+      setIsSubmittingReview(false);
+    }
   };
 
   useEffect(() => {
@@ -156,6 +283,25 @@ const Testimonials: React.FC<TestimonialsProps> = ({ hallData }) => {
           >
             Read reviews from couples who celebrated their special occasions at {hallData.name}.
           </motion.p>
+          
+          {/* Write Review Button for Customers */}
+          {isCustomer && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="mt-6"
+            >
+              <button
+                onClick={openReviewModal}
+                className="inline-flex items-center px-6 py-3 bg-[#FF477E] text-white rounded-full font-medium hover:bg-[#8a1e2f] transition-all transform hover:scale-105"
+              >
+                <Edit3 className="w-5 h-5 mr-2" />
+                Write a Review
+              </button>
+            </motion.div>
+          )}
         </div>
 
         <div className="relative">
@@ -302,6 +448,134 @@ const Testimonials: React.FC<TestimonialsProps> = ({ hallData }) => {
           </motion.div>
         )}
       </motion.div>
+
+      {/* Review Modal */}
+      {isReviewModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-white rounded-2xl shadow-2xl overflow-hidden max-w-lg w-full mx-4"
+          >
+            {/* Modal Header */}
+            <div className="px-6 py-4 bg-gradient-to-r from-[#9D2235] to-[#FF477E] relative">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center mr-3">
+                    <Edit3 className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">Write a Review</h3>
+                </div>
+                <button
+                  onClick={closeReviewModal}
+                  className="text-white/80 hover:text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <p className="text-white/90 text-sm mt-1 ml-11">
+                Share your experience at {hallData.name}
+              </p>
+            </div>
+
+            {/* Modal Content */}
+            <div className="px-6 py-6">
+              {reviewError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-700 text-sm">{reviewError}</p>
+                </div>
+              )}
+
+              {/* Rating Section */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  How would you rate your experience?
+                </label>
+                <div className="flex space-x-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      onClick={() => handleRatingClick(star)}
+                      className="p-1 transition-all hover:scale-110"
+                    >
+                      <Star
+                        size={32}
+                        className={`${
+                          star <= reviewData.rating
+                            ? "text-yellow-500 fill-yellow-500"
+                            : "text-gray-300 hover:text-yellow-300"
+                        } transition-colors`}
+                      />
+                    </button>
+                  ))}
+                </div>
+                {reviewData.rating > 0 && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    {reviewData.rating === 1 && "Poor"}
+                    {reviewData.rating === 2 && "Fair"}
+                    {reviewData.rating === 3 && "Good"}
+                    {reviewData.rating === 4 && "Very Good"}
+                    {reviewData.rating === 5 && "Excellent"}
+                  </p>
+                )}
+              </div>
+
+              {/* Comment Section */}
+              <div className="mb-6">
+                <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-2">
+                  Tell us about your experience
+                </label>
+                <textarea
+                  id="comment"
+                  rows={4}
+                  value={reviewData.comment}
+                  onChange={(e) => setReviewData(prev => ({ ...prev, comment: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9D2235] focus:border-transparent resize-none"
+                  placeholder="Share details about your event, the service, food quality, ambiance, and overall experience..."
+                  maxLength={500}
+                />
+                <div className="flex justify-between mt-1">
+                  <p className="text-xs text-gray-500">
+                    Help other customers by sharing your honest feedback
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {reviewData.comment.length}/500
+                  </p>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={closeReviewModal}
+                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={isSubmittingReview}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleReviewSubmit}
+                  disabled={isSubmittingReview || reviewData.rating === 0 || !reviewData.comment.trim()}
+                  className="px-6 py-2 bg-[#9D2235] text-white rounded-lg hover:bg-[#8a1e2f] transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmittingReview ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Review'
+                  )}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </section>
   );
 };

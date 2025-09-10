@@ -3,6 +3,7 @@
 
 import { useState } from "react"
 import { AlertContext } from "../context/AlertContext"
+import { useAuth } from "../context/AuthContext"
 import { useContext } from "react"
 import {
   Calendar,
@@ -123,11 +124,14 @@ const bookingsData = [
 
 
 const Dashboard = () => {
+  const { user } = useAuth()
   const [activeTab, setActiveTab] = useState("dashboard")
   const [selectedBooking, setSelectedBooking] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [rejectionReason, setRejectionReason] = useState("")
-  const [bookings, setBookings] = useState(bookingsData)
+  const [bookings, setBookings] = useState([])
+  const [bookingsLoading, setBookingsLoading] = useState(true)
+  const [bookingsError, setBookingsError] = useState(null)
   const [filterStatus, setFilterStatus] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [hallImages, setHallImages] = useState([
@@ -152,6 +156,127 @@ const Dashboard = () => {
   const [editHallId, setEditHallId] = useState(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
   const [originalAddressId, setOriginalAddressId] = useState(null);
+  
+  // CHAT state
+  const [selectedChat, setSelectedChat] = useState(null);
+  const [chatsByHall, setChatsByHall] = useState({
+    // Mock data for demo - grouped by hall
+    'hall-1': {
+      hallId: 'hall-1',
+      hallName: 'Grand Palace Hall',
+      chats: [
+        {
+          id: 'chat-1',
+          customerName: 'Ahmed Khan',
+          customerEmail: 'ahmed@example.com',
+          lastMessage: 'Thank you for the detailed information about the packages.',
+          lastMessageTime: new Date(Date.now() - 1800000), // 30 minutes ago
+          unreadCount: 2,
+          messages: [
+            {
+              id: 1,
+              text: "Hello! I'm interested in booking your hall for a wedding.",
+              sender: 'customer',
+              timestamp: new Date(Date.now() - 7200000),
+              customerName: 'Ahmed Khan'
+            },
+            {
+              id: 2,
+              text: "Hello Ahmed! Thank you for your interest. I'd be happy to help you plan your special day.",
+              sender: 'manager',
+              timestamp: new Date(Date.now() - 6900000)
+            },
+            {
+              id: 3,
+              text: "We're planning for around 300 guests. Do you have availability for December?",
+              sender: 'customer',
+              timestamp: new Date(Date.now() - 6600000),
+              customerName: 'Ahmed Khan'
+            },
+            {
+              id: 4,
+              text: "Yes, we have several dates available in December. Let me send you our premium package details.",
+              sender: 'manager',
+              timestamp: new Date(Date.now() - 6300000)
+            },
+            {
+              id: 5,
+              text: "Thank you for the detailed information about the packages.",
+              sender: 'customer',
+              timestamp: new Date(Date.now() - 1800000),
+              customerName: 'Ahmed Khan'
+            }
+          ]
+        },
+        {
+          id: 'chat-2',
+          customerName: 'Fatima Sheikh',
+          customerEmail: 'fatima@example.com',
+          lastMessage: 'Can we schedule a site visit this weekend?',
+          lastMessageTime: new Date(Date.now() - 3600000), // 1 hour ago
+          unreadCount: 1,
+          messages: [
+            {
+              id: 1,
+              text: "Hi, I'm looking for a venue for a corporate event.",
+              sender: 'customer',
+              timestamp: new Date(Date.now() - 14400000),
+              customerName: 'Fatima Sheikh'
+            },
+            {
+              id: 2,
+              text: "Hello Fatima! We'd love to host your corporate event. What type of event are you planning?",
+              sender: 'manager',
+              timestamp: new Date(Date.now() - 14100000)
+            },
+            {
+              id: 3,
+              text: "It's an annual conference for about 150 people. We need AV equipment and catering.",
+              sender: 'customer',
+              timestamp: new Date(Date.now() - 13800000),
+              customerName: 'Fatima Sheikh'
+            },
+            {
+              id: 4,
+              text: "Perfect! We have excellent AV facilities and can arrange catering. When are you planning the event?",
+              sender: 'manager',
+              timestamp: new Date(Date.now() - 13500000)
+            },
+            {
+              id: 5,
+              text: "Can we schedule a site visit this weekend?",
+              sender: 'customer',
+              timestamp: new Date(Date.now() - 3600000),
+              customerName: 'Fatima Sheikh'
+            }
+          ]
+        }
+      ]
+    },
+    'hall-2': {
+      hallId: 'hall-2',
+      hallName: 'Royal Banquet Hall',
+      chats: [
+        {
+          id: 'chat-3',
+          customerName: 'Zain Malik',
+          customerEmail: 'zain@example.com',
+          lastMessage: 'What are your rates for birthday parties?',
+          lastMessageTime: new Date(Date.now() - 7200000), // 2 hours ago
+          unreadCount: 1,
+          messages: [
+            {
+              id: 1,
+              text: "What are your rates for birthday parties?",
+              sender: 'customer',
+              timestamp: new Date(Date.now() - 7200000),
+              customerName: 'Zain Malik'
+            }
+          ]
+        }
+      ]
+    }
+  });
   // Base API
   const API = 'http://localhost:3000/api/v1';
 
@@ -160,11 +285,22 @@ const Dashboard = () => {
   const [amenities, setAmenities] = useState([])
   const [selectedAmenities, setSelectedAmenities] = useState([])
 
+  // Helper function to parse booking details
+  const parseBookingDetails = (bookingDetailsString) => {
+    try {
+      return JSON.parse(bookingDetailsString || '{}')
+    } catch {
+      return {}
+    }
+  }
+
   const filteredBookings = bookings.filter((booking) => {
+    const details = parseBookingDetails(booking.bookingDetails)
     const matchesStatus = filterStatus === "all" || booking.status === filterStatus
     const matchesSearch =
-      booking.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      booking.id.toLowerCase().includes(searchQuery.toLowerCase())
+      (details.contactName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (booking.bookingId?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (details.eventType?.toLowerCase() || '').includes(searchQuery.toLowerCase())
     return matchesStatus && matchesSearch
   })
 
@@ -180,10 +316,80 @@ const Dashboard = () => {
   const approvedBookings = bookings.filter((booking) => booking.status === "approved")
   const rejectedBookings = bookings.filter((booking) => booking.status === "rejected")
 
+  // Fetch bookings for manager's halls
+  const fetchManagerBookings = async () => {
+    if (!token) { 
+      showAlert("You must be logged in as Hall Manager.", "failure"); 
+      return; 
+    }
+    
+    try {
+      setBookingsLoading(true)
+      setBookingsError(null)
+      
+      // First get all manager's halls
+      const { data: hallsData } = await axios.get(`${API}/hall/owned/list`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      const halls = hallsData?.halls ?? hallsData ?? [];
+      
+      // Then fetch bookings for each hall
+      let allBookings = []
+      
+      for (const hall of halls) {
+        try {
+          const { data: bookingData } = await axios.get(`${API}/booking/hall/${hall.hallId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          const hallBookings = bookingData?.data ?? bookingData ?? [];
+          // Add hall information to each booking
+          const bookingsWithHall = hallBookings.map(booking => ({
+            ...booking,
+            hall: hall
+          }));
+          
+          allBookings = [...allBookings, ...bookingsWithHall];
+        } catch (error) {
+          console.error(`Failed to fetch bookings for hall ${hall.hallId}:`, error);
+        }
+      }
+      
+      setBookings(allBookings)
+    } catch (error) {
+      console.error('Error fetching manager bookings:', error)
+      setBookingsError(error.response?.data?.error || error.message || 'Failed to load bookings')
+      setBookings([])
+    } finally {
+      setBookingsLoading(false)
+    }
+  }
 
-  const handleApproveBooking = (id) => {
-    setBookings(bookings.map((booking) => (booking.id === id ? { ...booking, status: "approved" } : booking)))
-    setIsModalOpen(false)
+
+  const handleApproveBooking = async (bookingId) => {
+    if (!token) { 
+      showAlert("You must be logged in as Hall Manager.", "failure"); 
+      return; 
+    }
+
+    try {
+      await axios.patch(`${API}/booking/${bookingId}/approve`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // Update local state
+      setBookings(bookings.map((booking) => 
+        booking.bookingId === bookingId ? { ...booking, status: "approved" } : booking
+      ));
+      
+      showAlert("Booking approved successfully!", "success");
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Error approving booking:', error);
+      const message = error.response?.data?.error || 'Failed to approve booking';
+      showAlert(message, "failure");
+    }
   }
 
   const loadHallForEdit = async (rowHall) => {
@@ -238,17 +444,42 @@ const Dashboard = () => {
   };
 
 
-  const handleRejectBooking = (id) => {
+  const handleRejectBooking = async (bookingId) => {
     if (!rejectionReason.trim()) {
-      alert("Please provide a reason for rejection")
+      showAlert("Please provide a reason for rejection", "failure")
       return
     }
 
-    setBookings(
-      bookings.map((booking) => (booking.id === id ? { ...booking, status: "rejected", rejectionReason } : booking)),
-    )
-    setIsModalOpen(false)
-    setRejectionReason("")
+    if (!token) { 
+      showAlert("You must be logged in as Hall Manager.", "failure"); 
+      return; 
+    }
+
+    try {
+      await axios.patch(`${API}/booking/${bookingId}/reject`, 
+        { reason: rejectionReason }, 
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      // Update local state
+      setBookings(
+        bookings.map((booking) => 
+          booking.bookingId === bookingId 
+            ? { ...booking, status: "rejected", rejectionReason } 
+            : booking
+        )
+      );
+      
+      showAlert("Booking rejected successfully!", "success");
+      setIsModalOpen(false);
+      setRejectionReason("");
+    } catch (error) {
+      console.error('Error rejecting booking:', error);
+      const message = error.response?.data?.error || 'Failed to reject booking';
+      showAlert(message, "failure");
+    }
   }
 
   const openBookingModal = (booking) => {
@@ -479,7 +710,11 @@ const Dashboard = () => {
     }
     loadAmenities()
 
-    if (activeTab === 'myhalls') fetchOwnedHalls();
+    if (activeTab === 'myhalls') {
+      fetchOwnedHalls();
+    } else if (activeTab === 'bookings' || activeTab === 'dashboard') {
+      fetchManagerBookings();
+    }
   }, [activeTab])
 
   const [saving, setSaving] = useState(false)
@@ -596,6 +831,12 @@ const Dashboard = () => {
           >
             Manage Halls
           </button>
+          <button
+            className={`px-4 py-3 font-medium text-sm ${activeTab === "chats" ? "text-[#FF477E] border-b-2 border-[#FF477E]" : "text-gray-600 hover:text-gray-900"}`}
+            onClick={() => setActiveTab("chats")}
+          >
+            Messages
+          </button>
 
         </nav>
       </header>
@@ -612,14 +853,17 @@ const Dashboard = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500">Total Bookings</p>
+                    <p className="text-3xl font-bold text-gray-800 mt-1">
+                      {bookingsLoading ? '...' : bookings.length}
+                    </p>
                   </div>
                   <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
                     <Calendar className="h-6 w-6 text-blue-600" />
                   </div>
                 </div>
-                <div className="mt-4 text-sm text-green-600 flex items-center">
+                <div className="mt-4 text-sm text-blue-600 flex items-center">
                   <TrendingUp className="h-4 w-4 mr-1" />
-                  <span>12% increase this month</span>
+                  <span>All time bookings</span>
                 </div>
               </div>
 
@@ -650,6 +894,9 @@ const Dashboard = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500">Total Revenue</p>
+                    <p className="text-3xl font-bold text-gray-800 mt-1">
+                      {bookingsLoading ? '...' : `PKR ${approvedBookings.reduce((sum, booking) => sum + (booking.price || 0), 0).toLocaleString()}`}
+                    </p>
                   </div>
                   <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
                     <DollarSign className="h-6 w-6 text-green-600" />
@@ -657,7 +904,7 @@ const Dashboard = () => {
                 </div>
                 <div className="mt-4 text-sm text-green-600 flex items-center">
                   <TrendingUp className="h-4 w-4 mr-1" />
-                  <span>8% increase this month</span>
+                  <span>From approved bookings</span>
                 </div>
               </div>
 
@@ -665,10 +912,16 @@ const Dashboard = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500">Avg. Booking Value</p>
+                    <p className="text-3xl font-bold text-gray-800 mt-1">
+                      {bookingsLoading ? '...' : bookings.length > 0 ? `PKR ${Math.round(bookings.reduce((sum, booking) => sum + (booking.price || 0), 0) / bookings.length).toLocaleString()}` : 'PKR 0'}
+                    </p>
                   </div>
                   <div className="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center">
                     <BarChart2 className="h-6 w-6 text-purple-600" />
                   </div>
+                </div>
+                <div className="mt-4 text-sm text-purple-600">
+                  <span>Per booking average</span>
                 </div>
               </div>
             </div>
@@ -706,38 +959,61 @@ const Dashboard = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {bookings.slice(0, 5).map((booking) => (
-                      <tr key={booking.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{booking.id}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{booking.customerName}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{booking.eventType}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatDate(booking.date)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{booking.amount}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                            ${booking.status === "approved"
-                                ? "bg-green-100 text-green-800"
-                                : booking.status === "pending"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-red-100 text-red-800"
-                              }`}
-                          >
-                            {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          <button
-                            className="text-[#FF477E] hover:text-[#9D2235] font-medium"
-                            onClick={() => openBookingModal(booking)}
-                          >
-                            View Details
-                          </button>
+                    {bookingsLoading ? (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                          Loading bookings...
                         </td>
                       </tr>
-                    ))}
+                    ) : bookingsError ? (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-4 text-center text-red-500">
+                          {bookingsError}
+                        </td>
+                      </tr>
+                    ) : bookings.slice(0, 5).map((booking) => {
+                      const details = parseBookingDetails(booking.bookingDetails)
+                      return (
+                        <tr key={booking.bookingId} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {booking.bookingId.substring(0, 8)}...
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {details.contactName || booking.user?.name || 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {details.eventType || 'Event'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDate(booking.startDate)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            PKR {booking.price?.toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                              ${booking.status === "approved"
+                                  ? "bg-green-100 text-green-800"
+                                  : booking.status === "pending"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}
+                            >
+                              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <button
+                              className="text-[#FF477E] hover:text-[#9D2235] font-medium"
+                              onClick={() => openBookingModal(booking)}
+                            >
+                              View Details
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -831,24 +1107,34 @@ const Dashboard = () => {
               <div className="bg-white rounded-lg shadow p-6">
                 <h3 className="text-lg font-medium text-gray-800 mb-4">Upcoming Events</h3>
                 <div className="space-y-4">
-                  {approvedBookings.slice(0, 3).map((booking) => (
-                    <div key={booking.id} className="flex items-start">
-                      <div className="flex-shrink-0 bg-[#FF477E]/10 p-2 rounded-lg mr-3">
-                        <CalendarIcon className="h-5 w-5 text-[#FF477E]" />
+                  {bookingsLoading ? (
+                    <div className="text-center text-gray-500">Loading...</div>
+                  ) : approvedBookings.filter(booking => new Date(booking.startDate) >= new Date()).slice(0, 3).map((booking) => {
+                    const details = parseBookingDetails(booking.bookingDetails)
+                    return (
+                      <div key={booking.bookingId} className="flex items-start">
+                        <div className="flex-shrink-0 bg-[#FF477E]/10 p-2 rounded-lg mr-3">
+                          <CalendarIcon className="h-5 w-5 text-[#FF477E]" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{details.eventType || 'Event'}</p>
+                          <p className="text-xs text-gray-500">{formatDate(booking.startDate)}</p>
+                          <p className="text-xs text-gray-500 mt-1">{details.contactName || booking.user?.name || 'N/A'}</p>
+                          <p className="text-xs text-gray-400">{booking.hall?.name || 'Hall'}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{booking.eventType}</p>
-                        <p className="text-xs text-gray-500">{formatDate(booking.date)}</p>
-                        <p className="text-xs text-gray-500 mt-1">{booking.customerName}</p>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
+
+                  {!bookingsLoading && approvedBookings.filter(booking => new Date(booking.startDate) >= new Date()).length === 0 && (
+                    <div className="text-center text-gray-500 py-4">No upcoming events</div>
+                  )}
 
                   <button
                     className="text-[#FF477E] hover:text-[#9D2235] font-medium text-sm"
-                    onClick={() => setActiveTab("calendar")}
+                    onClick={() => setActiveTab("bookings")}
                   >
-                    View Full Calendar
+                    View All Bookings
                   </button>
                 </div>
               </div>
@@ -884,96 +1170,150 @@ const Dashboard = () => {
             </div>
 
             <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Booking ID
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Customer
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Event Type
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Date
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Package
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Amount
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredBookings.map((booking) => (
-                      <tr key={booking.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{booking.id}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{booking.customerName}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{booking.eventType}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatDate(booking.date)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{booking.package}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{booking.amount}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                            ${booking.status === "approved"
-                                ? "bg-green-100 text-green-800"
-                                : booking.status === "pending"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-red-100 text-red-800"
-                              }`}
-                          >
-                            {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          <button
-                            className="text-[#FF477E] hover:text-[#9D2235] font-medium mr-3"
-                            onClick={() => openBookingModal(booking)}
-                          >
-                            View
-                          </button>
-                          {booking.status === "pending" && (
-                            <>
-                              <button
-                                className="text-green-600 hover:text-green-800 font-medium mr-3"
-                                onClick={() => handleApproveBooking(booking.id)}
-                              >
-                                Approve
-                              </button>
-                              <button
-                                className="text-red-600 hover:text-red-800 font-medium"
-                                onClick={() => {
-                                  setSelectedBooking(booking)
-                                  setIsModalOpen(true)
-                                }}
-                              >
-                                Reject
-                              </button>
-                            </>
-                          )}
-                        </td>
-                      </tr>
+              {bookingsLoading ? (
+                <div className="p-6 text-center">
+                  <div className="animate-pulse space-y-4">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="flex space-x-4">
+                        <div className="h-4 bg-gray-300 rounded w-1/6"></div>
+                        <div className="h-4 bg-gray-300 rounded w-1/4"></div>
+                        <div className="h-4 bg-gray-300 rounded w-1/6"></div>
+                        <div className="h-4 bg-gray-300 rounded w-1/6"></div>
+                        <div className="h-4 bg-gray-300 rounded w-1/6"></div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-              {filteredBookings.length === 0 && (
-                <div className="py-8 text-center">
-                  <p className="text-gray-500">No bookings found matching your criteria.</p>
+                  </div>
                 </div>
+              ) : bookingsError ? (
+                <div className="p-6 text-center">
+                  <p className="text-red-500 mb-4">{bookingsError}</p>
+                  <button
+                    onClick={fetchManagerBookings}
+                    className="px-4 py-2 bg-[#FF477E] text-white rounded-lg hover:bg-[#9D2235]"
+                  >
+                    Retry Loading
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Booking ID
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Customer
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Event Type
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Hall
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Date & Time
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Amount
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {filteredBookings.map((booking) => {
+                          const details = parseBookingDetails(booking.bookingDetails)
+                          return (
+                            <tr key={booking.bookingId} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {booking.bookingId.substring(0, 8)}...
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {details.contactName || booking.user?.name || 'N/A'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {details.eventType || 'Event'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {booking.hall?.name || 'N/A'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <div>
+                                  <div>{formatDate(booking.startDate)}</div>
+                                  <div className="text-xs text-gray-400">{booking.timeSlotLabel}</div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                PKR {booking.price?.toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span
+                                  className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                  ${booking.status === "approved"
+                                      ? "bg-green-100 text-green-800"
+                                      : booking.status === "pending"
+                                        ? "bg-yellow-100 text-yellow-800"
+                                        : "bg-red-100 text-red-800"
+                                    }`}
+                                >
+                                  {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <button
+                                  className="text-[#FF477E] hover:text-[#9D2235] font-medium mr-3"
+                                  onClick={() => openBookingModal(booking)}
+                                >
+                                  View
+                                </button>
+                                {booking.status === "pending" && (
+                                  <>
+                                    <button
+                                      className="text-green-600 hover:text-green-800 font-medium mr-3"
+                                      onClick={() => handleApproveBooking(booking.bookingId)}
+                                    >
+                                      Approve
+                                    </button>
+                                    <button
+                                      className="text-red-600 hover:text-red-800 font-medium"
+                                      onClick={() => {
+                                        setSelectedBooking(booking)
+                                        setIsModalOpen(true)
+                                      }}
+                                    >
+                                      Reject
+                                    </button>
+                                  </>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {filteredBookings.length === 0 && !bookingsLoading && (
+                    <div className="py-8 text-center">
+                      <p className="text-gray-500">
+                        {searchQuery ? "No bookings found matching your search." : "No bookings found."}
+                      </p>
+                      {searchQuery && (
+                        <button
+                          onClick={() => setSearchQuery("")}
+                          className="mt-2 text-[#FF477E] hover:text-[#9D2235] font-medium text-sm"
+                        >
+                          Clear search
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -1499,6 +1839,155 @@ const Dashboard = () => {
           </div>
         )}
 
+        {activeTab === "chats" && (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Customer Messages</h2>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
+              {/* Chat List */}
+              <div className="lg:col-span-1 bg-white rounded-lg shadow overflow-hidden">
+                <div className="p-4 border-b border-gray-200">
+                  <h3 className="text-lg font-medium text-gray-800">Conversations</h3>
+                  <p className="text-sm text-gray-600">Grouped by halls</p>
+                </div>
+                <div className="overflow-y-auto h-full">
+                  {Object.values(chatsByHall).map((hallGroup) => (
+                    <div key={hallGroup.hallId}>
+                      {/* Hall Header */}
+                      <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
+                        <h4 className="text-sm font-medium text-gray-700">{hallGroup.hallName}</h4>
+                        <p className="text-xs text-gray-500">{hallGroup.chats.length} conversation{hallGroup.chats.length !== 1 ? 's' : ''}</p>
+                      </div>
+                      
+                      {/* Chats in this hall */}
+                      {hallGroup.chats.map((chat) => (
+                        <div
+                          key={chat.id}
+                          onClick={() => setSelectedChat(chat)}
+                          className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
+                            selectedChat?.id === chat.id ? 'bg-blue-50 border-blue-200' : ''
+                          }`}
+                        >
+                          <div className="flex items-start space-x-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-[#9D2235] to-[#FF477E] rounded-full flex items-center justify-center">
+                              <span className="text-white text-sm font-medium">
+                                {chat.customerName.split(' ').map(n => n[0]).join('')}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                  {chat.customerName}
+                                </p>
+                                {chat.unreadCount > 0 && (
+                                  <span className="bg-[#FF477E] text-white text-xs rounded-full px-2 py-1">
+                                    {chat.unreadCount}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-500 truncate">
+                                {chat.lastMessage}
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                {chat.lastMessageTime.toLocaleTimeString([], { 
+                                  hour: '2-digit', 
+                                  minute: '2-digit' 
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Chat Messages */}
+              <div className="lg:col-span-2 bg-white rounded-lg shadow overflow-hidden flex flex-col">
+                {selectedChat ? (
+                  <>
+                    {/* Chat Header */}
+                    <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-[#9D2235] to-[#FF477E] text-white">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center mr-3">
+                          <span className="text-white text-sm font-medium">
+                            {selectedChat.customerName.split(' ').map(n => n[0]).join('')}
+                          </span>
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-medium">{selectedChat.customerName}</h3>
+                          <p className="text-white/80 text-sm">{selectedChat.customerEmail}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Messages */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                      {selectedChat.messages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={`flex ${message.sender === 'manager' ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                            message.sender === 'manager'
+                              ? 'bg-[#9D2235] text-white rounded-br-md'
+                              : 'bg-white text-gray-900 border border-gray-200 rounded-bl-md'
+                          }`}>
+                            {message.sender === 'customer' && (
+                              <p className="text-xs text-gray-500 mb-1">{message.customerName}</p>
+                            )}
+                            <p className="text-sm">{message.text}</p>
+                            <p className={`text-xs mt-1 ${
+                              message.sender === 'manager' ? 'text-white/70' : 'text-gray-500'
+                            }`}>
+                              {message.timestamp.toLocaleTimeString([], { 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Message Input */}
+                    <div className="p-4 border-t border-gray-200">
+                      <div className="flex items-end space-x-2">
+                        <div className="flex-1">
+                          <textarea
+                            placeholder="Type your message..."
+                            className="w-full px-4 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-[#9D2235] focus:border-transparent resize-none max-h-20"
+                            rows={1}
+                          />
+                        </div>
+                        <button className="p-2 bg-[#9D2235] text-white rounded-full hover:bg-[#8a1e2f] transition-colors">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                          </svg>
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        Press Enter to send, Shift+Enter for new line
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                      <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Select a conversation</h3>
+                      <p className="text-gray-500">Choose a customer chat from the left to start messaging</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
 
       {/* Booking Details Modal */}
@@ -1510,66 +1999,88 @@ const Dashboard = () => {
             </div>
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Booking ID</p>
-                  <p className="text-gray-800">{selectedBooking.id}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Customer Name</p>
-                  <p className="text-gray-800">{selectedBooking.customerName}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Event Type</p>
-                  <p className="text-gray-800">{selectedBooking.eventType}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Date & Time</p>
-                  <p className="text-gray-800">
-                    {formatDate(selectedBooking.date)}, {selectedBooking.time}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Guest Count</p>
-                  <p className="text-gray-800">{selectedBooking.guestCount}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Package</p>
-                  <p className="text-gray-800">{selectedBooking.package}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Amount</p>
-                  <p className="text-gray-800">{selectedBooking.amount}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Status</p>
-                  <p className="text-gray-800">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                      ${selectedBooking.status === "approved"
-                          ? "bg-green-100 text-green-800"
-                          : selectedBooking.status === "pending"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                    >
-                      {selectedBooking.status.charAt(0).toUpperCase() + selectedBooking.status.slice(1)}
-                    </span>
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Email</p>
-                  <p className="text-gray-800">{selectedBooking.contactInfo.email}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Phone</p>
-                  <p className="text-gray-800">{selectedBooking.contactInfo.phone}</p>
-                </div>
-                {selectedBooking.rejectionReason && (
-                  <div className="col-span-2">
-                    <p className="text-sm font-medium text-gray-500">Rejection Reason</p>
-                    <p className="text-gray-800">{selectedBooking.rejectionReason}</p>
-                  </div>
-                )}
+                {(() => {
+                  const details = parseBookingDetails(selectedBooking.bookingDetails)
+                  return (
+                    <>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Booking ID</p>
+                        <p className="text-gray-800">{selectedBooking.bookingId}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Customer Name</p>
+                        <p className="text-gray-800">{details.contactName || selectedBooking.user?.name || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Event Type</p>
+                        <p className="text-gray-800">{details.eventType || 'Event'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Hall</p>
+                        <p className="text-gray-800">{selectedBooking.hall?.name || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Date & Time</p>
+                        <p className="text-gray-800">
+                          {formatDate(selectedBooking.startDate)}<br />
+                          <span className="text-sm text-gray-600">{selectedBooking.timeSlotLabel}</span>
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Duration</p>
+                        <p className="text-gray-800">{selectedBooking.duration} hours</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Guest Count</p>
+                        <p className="text-gray-800">{selectedBooking.guests} guests</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Amount</p>
+                        <p className="text-gray-800">PKR {selectedBooking.price?.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Status</p>
+                        <p className="text-gray-800">
+                          <span
+                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                            ${selectedBooking.status === "approved"
+                                ? "bg-green-100 text-green-800"
+                                : selectedBooking.status === "pending"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
+                          >
+                            {selectedBooking.status.charAt(0).toUpperCase() + selectedBooking.status.slice(1)}
+                          </span>
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Booking Date</p>
+                        <p className="text-gray-800">{formatDate(selectedBooking.createdAt)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Email</p>
+                        <p className="text-gray-800">{details.contactEmail || selectedBooking.user?.email || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Phone</p>
+                        <p className="text-gray-800">{details.contactPhone || selectedBooking.user?.phone || 'N/A'}</p>
+                      </div>
+                      {details.specialRequests && (
+                        <div className="col-span-2">
+                          <p className="text-sm font-medium text-gray-500">Special Requests</p>
+                          <p className="text-gray-800">{details.specialRequests}</p>
+                        </div>
+                      )}
+                      {selectedBooking.rejectionReason && (
+                        <div className="col-span-2">
+                          <p className="text-sm font-medium text-gray-500">Rejection Reason</p>
+                          <p className="text-gray-800">{selectedBooking.rejectionReason}</p>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
             </div>
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-4">
@@ -1586,16 +2097,18 @@ const Dashboard = () => {
                 <>
                   <button
                     className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
-                    onClick={() => handleApproveBooking(selectedBooking.id)}
+                    onClick={() => handleApproveBooking(selectedBooking.bookingId)}
                   >
                     Approve
                   </button>
                   <button
                     className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
                     onClick={() => {
-                      if (selectedBooking) {
-                        setSelectedBooking(selectedBooking)
-                        setIsModalOpen(true)
+                      // Modal is already open with selectedBooking, just need rejection reason
+                      if (!rejectionReason.trim()) {
+                        document.getElementById('rejectionReason')?.focus()
+                      } else {
+                        handleRejectBooking(selectedBooking.bookingId)
                       }
                     }}
                   >
@@ -1621,7 +2134,7 @@ const Dashboard = () => {
                   <button
                     type="button"
                     className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
-                    onClick={() => handleRejectBooking(selectedBooking.id)}
+                    onClick={() => handleRejectBooking(selectedBooking.bookingId)}
                   >
                     Reject Booking
                   </button>

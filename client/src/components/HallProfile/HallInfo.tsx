@@ -199,7 +199,7 @@ const HallInfo: React.FC<HallInfoProps> = ({ hallData }) => {
                   href="#booking"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className="block w-full py-3 bg-[#9D2235] text-white text-center font-medium rounded-full hover:bg-[#8a1e2f] transition-all"
+                  className="block w-full py-3 bg-[#FF477E] text-white text-center font-medium rounded-full hover:bg-[#8a1e2f] transition-all"
                 >
                   Check Availability
                 </motion.a>
@@ -237,7 +237,7 @@ const HallInfo: React.FC<HallInfoProps> = ({ hallData }) => {
                   href="#booking"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className="block w-full py-3 bg-[#9D2235] text-white text-center font-medium rounded-full hover:bg-[#8a1e2f] transition-all"
+                  className="block w-full py-3 bg-[#FF477E] text-white text-center font-medium rounded-full hover:bg-[#8a1e2f] transition-all"
                 >
                   Check Availability
                 </motion.a>

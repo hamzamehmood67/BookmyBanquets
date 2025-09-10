@@ -229,7 +229,7 @@ const AboutHall: React.FC<AboutHallProps> = ({ hallData }) => {
                 Contact our event planning team for personalized assistance with
                 any queries you may have about our venue or services.
               </p>
-              <button onClick={() => navigate('/contact')} className="mt-4 px-4 py-2 bg-[#9D2235] text-white rounded-lg text-sm font-medium hover:bg-[#8a1e2f] transition-colors">
+              <button onClick={() => navigate('/contact')} className="mt-4 px-4 py-2 bg-[#FF477E] text-white rounded-lg text-sm font-medium hover:bg-[#8a1e2f] transition-colors">
                 Contact Us
               </button>
             </motion.div>
