@@ -60,6 +60,7 @@ model Hall {
   bookings  Booking[]
   reviews   Review[]
   amenities AmenitiesHall[]
+  chats     Chat[]
 }
 
 model Booking {
@@ -104,6 +105,9 @@ model Chat {
 
   toId String
   to   User   @relation("ChatTo", fields: [toId], references: [userId])
+
+  hallId String
+  hall   Hall   @relation(fields: [hallId], references: [hallId])
 
   messages Message[]
 }

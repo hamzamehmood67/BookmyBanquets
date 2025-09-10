@@ -2,42 +2,16 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, MessageCircle, Clock, CheckCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 
 const ChatModal = ({ isOpen, onClose, hallData }) => {
   const { user } = useAuth();
-  const [messages, setMessages] = useState([
-    // Mock messages for UI demonstration
-    {
-      id: 1,
-      text: "Hello! I'm interested in booking your hall for a wedding. Could you please provide more details about the packages?",
-      sender: 'customer',
-      timestamp: new Date(Date.now() - 3600000), // 1 hour ago
-      status: 'read'
-    },
-    {
-      id: 2,
-      text: "Hello! Thank you for your interest. We'd be happy to help you with your wedding. We offer several packages tailored for different needs. When are you planning the event?",
-      sender: 'manager',
-      timestamp: new Date(Date.now() - 3300000), // 55 minutes ago
-      status: 'read'
-    },
-    {
-      id: 3,
-      text: "We're planning for December 15th, 2024. Expecting around 250-300 guests. What are your availability and pricing options?",
-      sender: 'customer',
-      timestamp: new Date(Date.now() - 3000000), // 50 minutes ago
-      status: 'read'
-    },
-    {
-      id: 4,
-      text: "Perfect! December 15th is available. For 250-300 guests, I'd recommend our Premium package which includes decoration, catering, and sound system. Let me send you the detailed proposal.",
-      sender: 'manager',
-      timestamp: new Date(Date.now() - 2700000), // 45 minutes ago
-      status: 'read'
-    }
-  ]);
+  const { socket, isConnected, joinHallChat, sendMessage } = useSocket();
+  const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [chatId, setChatId] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -48,35 +22,78 @@ const ChatModal = ({ isOpen, onClose, hallData }) => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = () => {
-    if (!newMessage.trim()) return;
+  // Join hall chat when modal opens
+  useEffect(() => {
+    if (isOpen && hallData?.hallId && socket && isConnected) {
+      console.log('Joining hall chat for:', hallData.hallId);
+      joinHallChat(hallData.hallId);
+      setIsLoading(true);
+    }
+  }, [isOpen, hallData?.hallId, socket, isConnected, joinHallChat]);
 
-    const message = {
-      id: Date.now(),
-      text: newMessage,
-      sender: user?.role === 'customer' ? 'customer' : 'manager',
-      timestamp: new Date(),
-      status: 'sent'
+  // Socket event listeners
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleChatHistory = (data) => {
+      console.log('Received chat history:', data);
+      setChatId(data.chatId);
+      setMessages(data.messages.map(msg => ({
+        id: msg.messageId,
+        text: msg.text,
+        sender: msg.from.role,
+        timestamp: new Date(msg.sentAt),
+        status: 'read',
+        senderName: msg.from.name
+      })));
+      setIsLoading(false);
     };
 
-    setMessages(prev => [...prev, message]);
-    setNewMessage('');
+    const handleNewMessage = (data) => {
+      console.log('Received new message:', data);
+      setChatId(data.chatId);
+      const newMsg = {
+        id: data.message.messageId,
+        text: data.message.text,
+        sender: data.message.from.role,
+        timestamp: new Date(data.message.sentAt),
+        status: 'delivered',
+        senderName: data.message.from.name
+      };
+      setMessages(prev => [...prev, newMsg]);
+    };
 
-    // Simulate typing indicator and response (for demo)
-    if (user?.role === 'customer') {
-      setIsTyping(true);
-      setTimeout(() => {
-        setIsTyping(false);
-        const response = {
-          id: Date.now() + 1,
-          text: "Thank you for your message. I'll get back to you shortly with more details.",
-          sender: 'manager',
-          timestamp: new Date(),
-          status: 'sent'
-        };
-        setMessages(prev => [...prev, response]);
-      }, 2000);
+    const handleError = (error) => {
+      console.error('Socket error:', error);
+      setIsLoading(false);
+    };
+
+    socket.on('chat_history', handleChatHistory);
+    socket.on('new_message', handleNewMessage);
+    socket.on('error', handleError);
+
+    return () => {
+      socket.off('chat_history', handleChatHistory);
+      socket.off('new_message', handleNewMessage);
+      socket.off('error', handleError);
+    };
+  }, [socket]);
+
+  const handleSendMessage = () => {
+    if (!newMessage.trim() || !socket || !isConnected || !hallData?.hallId) {
+      console.log("Cannot send message - missing requirements:", {
+        hasMessage: !!newMessage.trim(),
+        hasSocket: !!socket,
+        isConnected: isConnected,
+        hasHallId: !!hallData?.hallId
+      });
+      return;
     }
+
+    console.log("Sending message to hall:", hallData.hallId);
+    // Send message via WebSocket
+    sendMessage(hallData.hallId, newMessage.trim());
+    setNewMessage('');
   };
 
   const handleKeyPress = (e) => {
@@ -149,7 +166,23 @@ const ChatModal = ({ isOpen, onClose, hallData }) => {
 
           {/* Chat Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-            {messages.map((message, index) => {
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#9D2235] mx-auto mb-4"></div>
+                  <p className="text-gray-500 text-sm">Loading chat history...</p>
+                </div>
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <MessageCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500 text-sm">No messages yet</p>
+                  <p className="text-gray-400 text-xs">Start the conversation!</p>
+                </div>
+              </div>
+            ) : (
+              messages.map((message, index) => {
               const isNewDay = index === 0 || 
                 formatDate(message.timestamp) !== formatDate(messages[index - 1].timestamp);
               
@@ -190,7 +223,7 @@ const ChatModal = ({ isOpen, onClose, hallData }) => {
                   </div>
                 </div>
               );
-            })}
+            }))}
             
             {/* Typing indicator */}
             {isTyping && (

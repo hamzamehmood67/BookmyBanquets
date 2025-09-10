@@ -4,6 +4,7 @@
 import { useState } from "react"
 import { AlertContext } from "../context/AlertContext"
 import { useAuth } from "../context/AuthContext"
+import { useSocket } from "../context/SocketContext"
 import { useContext } from "react"
 import {
   Calendar,
@@ -125,6 +126,7 @@ const bookingsData = [
 
 const Dashboard = () => {
   const { user } = useAuth()
+  const { socket, isConnected, getManagerChats, sendMessage } = useSocket()
   const [activeTab, setActiveTab] = useState("dashboard")
   const [selectedBooking, setSelectedBooking] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -159,126 +161,118 @@ const Dashboard = () => {
   
   // CHAT state
   const [selectedChat, setSelectedChat] = useState(null);
-  const [chatsByHall, setChatsByHall] = useState({
-    // Mock data for demo - grouped by hall
-    'hall-1': {
-      hallId: 'hall-1',
-      hallName: 'Grand Palace Hall',
-      chats: [
-        {
-          id: 'chat-1',
-          customerName: 'Ahmed Khan',
-          customerEmail: 'ahmed@example.com',
-          lastMessage: 'Thank you for the detailed information about the packages.',
-          lastMessageTime: new Date(Date.now() - 1800000), // 30 minutes ago
-          unreadCount: 2,
-          messages: [
-            {
-              id: 1,
-              text: "Hello! I'm interested in booking your hall for a wedding.",
-              sender: 'customer',
-              timestamp: new Date(Date.now() - 7200000),
-              customerName: 'Ahmed Khan'
-            },
-            {
-              id: 2,
-              text: "Hello Ahmed! Thank you for your interest. I'd be happy to help you plan your special day.",
-              sender: 'manager',
-              timestamp: new Date(Date.now() - 6900000)
-            },
-            {
-              id: 3,
-              text: "We're planning for around 300 guests. Do you have availability for December?",
-              sender: 'customer',
-              timestamp: new Date(Date.now() - 6600000),
-              customerName: 'Ahmed Khan'
-            },
-            {
-              id: 4,
-              text: "Yes, we have several dates available in December. Let me send you our premium package details.",
-              sender: 'manager',
-              timestamp: new Date(Date.now() - 6300000)
-            },
-            {
-              id: 5,
-              text: "Thank you for the detailed information about the packages.",
-              sender: 'customer',
-              timestamp: new Date(Date.now() - 1800000),
-              customerName: 'Ahmed Khan'
-            }
-          ]
-        },
-        {
-          id: 'chat-2',
-          customerName: 'Fatima Sheikh',
-          customerEmail: 'fatima@example.com',
-          lastMessage: 'Can we schedule a site visit this weekend?',
-          lastMessageTime: new Date(Date.now() - 3600000), // 1 hour ago
-          unreadCount: 1,
-          messages: [
-            {
-              id: 1,
-              text: "Hi, I'm looking for a venue for a corporate event.",
-              sender: 'customer',
-              timestamp: new Date(Date.now() - 14400000),
-              customerName: 'Fatima Sheikh'
-            },
-            {
-              id: 2,
-              text: "Hello Fatima! We'd love to host your corporate event. What type of event are you planning?",
-              sender: 'manager',
-              timestamp: new Date(Date.now() - 14100000)
-            },
-            {
-              id: 3,
-              text: "It's an annual conference for about 150 people. We need AV equipment and catering.",
-              sender: 'customer',
-              timestamp: new Date(Date.now() - 13800000),
-              customerName: 'Fatima Sheikh'
-            },
-            {
-              id: 4,
-              text: "Perfect! We have excellent AV facilities and can arrange catering. When are you planning the event?",
-              sender: 'manager',
-              timestamp: new Date(Date.now() - 13500000)
-            },
-            {
-              id: 5,
-              text: "Can we schedule a site visit this weekend?",
-              sender: 'customer',
-              timestamp: new Date(Date.now() - 3600000),
-              customerName: 'Fatima Sheikh'
-            }
-          ]
-        }
-      ]
-    },
-    'hall-2': {
-      hallId: 'hall-2',
-      hallName: 'Royal Banquet Hall',
-      chats: [
-        {
-          id: 'chat-3',
-          customerName: 'Zain Malik',
-          customerEmail: 'zain@example.com',
-          lastMessage: 'What are your rates for birthday parties?',
-          lastMessageTime: new Date(Date.now() - 7200000), // 2 hours ago
-          unreadCount: 1,
-          messages: [
-            {
-              id: 1,
-              text: "What are your rates for birthday parties?",
-              sender: 'customer',
-              timestamp: new Date(Date.now() - 7200000),
-              customerName: 'Zain Malik'
-            }
-          ]
-        }
-      ]
-    }
-  });
+  const [chatsByHall, setChatsByHall] = useState({});
+  const [chatsLoading, setChatsLoading] = useState(false);
+  const [newChatMessage, setNewChatMessage] = useState('');
+  
   // Base API
   const API = 'http://localhost:3000/api/v1';
+
+  // Fetch manager chats via WebSocket
+  const fetchManagerChats = () => {
+    if (socket && isConnected && user?.role === 'manager') {
+      setChatsLoading(true);
+      getManagerChats();
+    }
+  };
+
+  // Socket event listeners for chat functionality
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleManagerChats = (data) => {
+      console.log('Received manager chats:', data);
+      const formattedChats = {};
+      
+      data.halls.forEach(hall => {
+        formattedChats[hall.hallId] = {
+          hallId: hall.hallId,
+          hallName: hall.name,
+          chats: hall.chats.map(chat => ({
+            id: chat.chatId,
+            customerName: chat.from.role === 'customer' ? chat.from.name : chat.to.name,
+            customerId: chat.from.role === 'customer' ? chat.from.userId : chat.to.userId,
+            lastMessage: chat.messages[0]?.text || 'No messages yet',
+            lastMessageTime: chat.messages[0] ? new Date(chat.messages[0].sentAt) : new Date(chat.createdAt),
+            unreadCount: 0, // Can be calculated based on message read status
+            messages: chat.messages.map(msg => ({
+              id: msg.messageId,
+              text: msg.text,
+              sender: msg.from.role,
+              timestamp: new Date(msg.sentAt),
+              customerName: msg.from.role === 'customer' ? msg.from.name : undefined
+            }))
+          }))
+        };
+      });
+      
+      setChatsByHall(formattedChats);
+      setChatsLoading(false);
+    };
+
+    const handleNewMessage = (data) => {
+      console.log('Received new message in manager dashboard:', data);
+      // Update the specific chat with the new message
+      setChatsByHall(prev => {
+        const updated = { ...prev };
+        const hallChats = updated[data.hallId];
+        if (hallChats) {
+          const chatIndex = hallChats.chats.findIndex(chat => chat.id === data.chatId);
+          if (chatIndex !== -1) {
+            const newMsg = {
+              id: data.message.messageId,
+              text: data.message.text,
+              sender: data.message.from.role,
+              timestamp: new Date(data.message.sentAt),
+              customerName: data.message.from.role === 'customer' ? data.message.from.name : undefined
+            };
+            hallChats.chats[chatIndex].messages.push(newMsg);
+            hallChats.chats[chatIndex].lastMessage = data.message.text;
+            hallChats.chats[chatIndex].lastMessageTime = new Date(data.message.sentAt);
+          }
+        }
+        return updated;
+      });
+    };
+
+    const handleError = (error) => {
+      console.error('Chat socket error:', error);
+      setChatsLoading(false);
+    };
+
+    socket.on('manager_chats', handleManagerChats);
+    socket.on('new_message', handleNewMessage);
+    socket.on('error', handleError);
+
+    return () => {
+      socket.off('manager_chats', handleManagerChats);
+      socket.off('new_message', handleNewMessage);
+      socket.off('error', handleError);
+    };
+  }, [socket]);
+
+  // Load chats when component mounts or when switching to chats tab
+  useEffect(() => {
+    if (activeTab === 'chats' && socket && isConnected && user?.role === 'manager') {
+      fetchManagerChats();
+    }
+  }, [activeTab, socket, isConnected, user?.role]);
+
+  // Handle sending messages in manager chat
+  const handleSendChatMessage = () => {
+    if (!newChatMessage.trim() || !selectedChat || !socket || !isConnected) return;
+
+    // Find the hall ID for this chat
+    const hallId = Object.keys(chatsByHall).find(hId => 
+      chatsByHall[hId].chats.some(chat => chat.id === selectedChat.id)
+    );
+    
+    if (!hallId) return;
+
+    // Send message via WebSocket
+    sendMessage(hallId, newChatMessage.trim(), selectedChat.customerId);
+    setNewChatMessage('');
+  };
 
 
   // IMPORTANT: load real amenities from backend
@@ -1851,7 +1845,19 @@ const Dashboard = () => {
                   <p className="text-sm text-gray-600">Grouped by halls</p>
                 </div>
                 <div className="overflow-y-auto h-full">
-                  {Object.values(chatsByHall).map((hallGroup) => (
+                  {chatsLoading ? (
+                    <div className="flex items-center justify-center h-32">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#9D2235]"></div>
+                    </div>
+                  ) : Object.keys(chatsByHall).length === 0 ? (
+                    <div className="flex items-center justify-center h-32">
+                      <div className="text-center text-gray-500">
+                        <p className="text-sm">No conversations yet</p>
+                        <p className="text-xs">Customers will appear here when they start chatting</p>
+                      </div>
+                    </div>
+                  ) : (
+                    Object.values(chatsByHall).map((hallGroup) => (
                     <div key={hallGroup.hallId}>
                       {/* Hall Header */}
                       <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
@@ -1899,7 +1905,7 @@ const Dashboard = () => {
                         </div>
                       ))}
                     </div>
-                  ))}
+                  )))}
                 </div>
               </div>
 
@@ -1956,12 +1962,24 @@ const Dashboard = () => {
                       <div className="flex items-end space-x-2">
                         <div className="flex-1">
                           <textarea
+                            value={newChatMessage}
+                            onChange={(e) => setNewChatMessage(e.target.value)}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSendChatMessage();
+                              }
+                            }}
                             placeholder="Type your message..."
                             className="w-full px-4 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-[#9D2235] focus:border-transparent resize-none max-h-20"
                             rows={1}
                           />
                         </div>
-                        <button className="p-2 bg-[#9D2235] text-white rounded-full hover:bg-[#8a1e2f] transition-colors">
+                        <button 
+                          onClick={handleSendChatMessage}
+                          disabled={!newChatMessage.trim() || !socket || !isConnected}
+                          className="p-2 bg-[#9D2235] text-white rounded-full hover:bg-[#8a1e2f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                           </svg>
