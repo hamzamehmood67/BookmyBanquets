@@ -190,6 +190,7 @@ const listPublicHalls = async (req, res) => {
 };
 
  const getHallBookings = async (req, res) => {
+  console.log(req.params.id);
   try {
     const bookings = await prisma.booking.findMany({ where: { hallId: req.params.id } });
     res.json(bookings);

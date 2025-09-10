@@ -82,7 +82,12 @@ router.post('/login', validateData(userSchemaLogin), async (req, res) => {
     if (!user.isActive) {
         return res.status(400).json({ error: 'Please verify your email to login' });
     }
-    const token = jwt.sign({ email }, process.env.JWT_SECRET);
+    const token = jwt.sign({ 
+        userId: user.userId, 
+        email: user.email, 
+        role: user.role 
+    }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    
     res.status(200).json({ user, token });
 });
 
