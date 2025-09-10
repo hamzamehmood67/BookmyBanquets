@@ -26,8 +26,10 @@ const ChatModal = ({ isOpen, onClose, hallData }) => {
   useEffect(() => {
     if (isOpen && hallData?.hallId && socket && isConnected) {
       console.log('Joining hall chat for:', hallData.hallId);
-      joinHallChat(hallData.hallId);
       setIsLoading(true);
+      setMessages([]);
+      setChatId(null);
+      joinHallChat(hallData.hallId);
     }
   }, [isOpen, hallData?.hallId, socket, isConnected, joinHallChat]);
 
@@ -38,14 +40,22 @@ const ChatModal = ({ isOpen, onClose, hallData }) => {
     const handleChatHistory = (data) => {
       console.log('Received chat history:', data);
       setChatId(data.chatId);
-      setMessages(data.messages.map(msg => ({
-        id: msg.messageId,
-        text: msg.text,
-        sender: msg.from.role,
-        timestamp: new Date(msg.sentAt),
-        status: 'read',
-        senderName: msg.from.name
-      })));
+      
+      // Handle empty messages array or null chatId
+      if (data.messages && data.messages.length > 0) {
+        setMessages(data.messages.map(msg => ({
+          id: msg.messageId,
+          text: msg.text,
+          sender: msg.from.role,
+          timestamp: new Date(msg.sentAt),
+          status: 'read',
+          senderName: msg.from.name
+        })));
+      } else {
+        console.log('No existing messages, starting with empty chat');
+        setMessages([]);
+      }
+      
       setIsLoading(false);
     };
 

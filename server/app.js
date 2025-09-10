@@ -121,6 +121,13 @@ io.on('connection', (socket) => {
           hallId,
           messages: existingChat.messages
         });
+      } else {
+        // No existing chat, send empty chat history
+        socket.emit('chat_history', {
+          chatId: null,
+          hallId,
+          messages: []
+        });
       }
 
     } catch (error) {

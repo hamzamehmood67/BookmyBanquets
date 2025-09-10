@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { AlertContext } from "../context/AlertContext"
 import { useAuth } from "../context/AuthContext"
 import { useSocket } from "../context/SocketContext"
@@ -164,9 +164,15 @@ const Dashboard = () => {
   const [chatsByHall, setChatsByHall] = useState({});
   const [chatsLoading, setChatsLoading] = useState(false);
   const [newChatMessage, setNewChatMessage] = useState('');
+  const messagesEndRef = useRef(null);
   
   // Base API
   const API = 'http://localhost:3000/api/v1';
+
+  // Scroll to bottom of messages
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   // Fetch manager chats via WebSocket
   const fetchManagerChats = () => {
@@ -212,27 +218,58 @@ const Dashboard = () => {
 
     const handleNewMessage = (data) => {
       console.log('Received new message in manager dashboard:', data);
-      // Update the specific chat with the new message
+      
+      const newMsg = {
+        id: data.message.messageId,
+        text: data.message.text,
+        sender: data.message.from.role,
+        timestamp: new Date(data.message.sentAt),
+        customerName: data.message.from.role === 'customer' ? data.message.from.name : undefined
+      };
+      
+      // Update the chat list
       setChatsByHall(prev => {
         const updated = { ...prev };
         const hallChats = updated[data.hallId];
         if (hallChats) {
           const chatIndex = hallChats.chats.findIndex(chat => chat.id === data.chatId);
           if (chatIndex !== -1) {
-            const newMsg = {
-              id: data.message.messageId,
-              text: data.message.text,
-              sender: data.message.from.role,
-              timestamp: new Date(data.message.sentAt),
-              customerName: data.message.from.role === 'customer' ? data.message.from.name : undefined
-            };
-            hallChats.chats[chatIndex].messages.push(newMsg);
+            // Update last message in chat list
             hallChats.chats[chatIndex].lastMessage = data.message.text;
             hallChats.chats[chatIndex].lastMessageTime = new Date(data.message.sentAt);
           }
         }
         return updated;
       });
+      
+      // Update the selected chat messages if this message belongs to the currently selected chat
+      if (selectedChat && selectedChat.id === data.chatId) {
+        setSelectedChat(prev => {
+          const existingMessages = prev.messages || [];
+          
+          // Check if this is replacing an optimistic message
+          const optimisticIndex = existingMessages.findIndex(msg => 
+            msg.id.toString().startsWith('temp-') && 
+            msg.text === newMsg.text && 
+            msg.sender === newMsg.sender &&
+            Math.abs(new Date(msg.timestamp) - new Date(newMsg.timestamp)) < 10000 // Within 10 seconds
+          );
+          
+          if (optimisticIndex !== -1) {
+            // Replace optimistic message with real message
+            const updatedMessages = [...existingMessages];
+            updatedMessages[optimisticIndex] = { ...newMsg, status: 'delivered' };
+            return { ...prev, messages: updatedMessages };
+          } else {
+            // Check for duplicate messages
+            const isDuplicate = existingMessages.some(msg => msg.id === newMsg.id);
+            if (!isDuplicate) {
+              return { ...prev, messages: [...existingMessages, newMsg] };
+            }
+            return prev;
+          }
+        });
+      }
     };
 
     const handleError = (error) => {
@@ -258,6 +295,50 @@ const Dashboard = () => {
     }
   }, [activeTab, socket, isConnected, user?.role]);
 
+  // Fetch full chat history when a chat is selected
+  const fetchChatHistory = async (chatId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API}/chat/${chatId}/messages`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data.status === 'success') {
+        const fullMessages = response.data.data.messages.map(msg => ({
+          id: msg.messageId,
+          text: msg.text,
+          sender: msg.from.role,
+          timestamp: new Date(msg.sentAt),
+          customerName: msg.from.role === 'customer' ? msg.from.name : undefined
+        }));
+        
+        // Update the selected chat with full message history
+        setSelectedChat(prev => ({
+          ...prev,
+          messages: fullMessages
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching chat history:', error);
+    }
+  };
+
+  // Handle chat selection
+  const handleChatSelect = (chat) => {
+    setSelectedChat(chat);
+    // Fetch full message history for this chat
+    fetchChatHistory(chat.id);
+    
+    // Join the hall chat room to receive real-time messages
+    const hallId = Object.keys(chatsByHall).find(hId => 
+      chatsByHall[hId].chats.some(c => c.id === chat.id)
+    );
+    if (hallId && socket && isConnected) {
+      console.log('Manager joining hall chat room:', hallId);
+      socket.emit('join_hall_chat', { hallId });
+    }
+  };
+
   // Handle sending messages in manager chat
   const handleSendChatMessage = () => {
     if (!newChatMessage.trim() || !selectedChat || !socket || !isConnected) return;
@@ -269,8 +350,42 @@ const Dashboard = () => {
     
     if (!hallId) return;
 
+    const messageText = newChatMessage.trim();
+    
+    // Optimistic update - add message to UI immediately
+    const optimisticMessage = {
+      id: `temp-${Date.now()}`, // Temporary ID
+      text: messageText,
+      sender: 'manager',
+      timestamp: new Date(),
+      status: 'sending'
+    };
+    
+    // Add message to selected chat immediately
+    setSelectedChat(prev => ({
+      ...prev,
+      messages: [...(prev.messages || []), optimisticMessage]
+    }));
+    
+    // Scroll to bottom after adding message
+    setTimeout(scrollToBottom, 100);
+    
+    // Update last message in chat list
+    setChatsByHall(prev => {
+      const updated = { ...prev };
+      const hallChats = updated[hallId];
+      if (hallChats) {
+        const chatIndex = hallChats.chats.findIndex(chat => chat.id === selectedChat.id);
+        if (chatIndex !== -1) {
+          hallChats.chats[chatIndex].lastMessage = messageText;
+          hallChats.chats[chatIndex].lastMessageTime = new Date();
+        }
+      }
+      return updated;
+    });
+
     // Send message via WebSocket
-    sendMessage(hallId, newChatMessage.trim(), selectedChat.customerId);
+    sendMessage(hallId, messageText, selectedChat.customerId);
     setNewChatMessage('');
   };
 
@@ -1869,7 +1984,7 @@ const Dashboard = () => {
                       {hallGroup.chats.map((chat) => (
                         <div
                           key={chat.id}
-                          onClick={() => setSelectedChat(chat)}
+                          onClick={() => handleChatSelect(chat)}
                           className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
                             selectedChat?.id === chat.id ? 'bg-blue-50 border-blue-200' : ''
                           }`}
@@ -1955,6 +2070,7 @@ const Dashboard = () => {
                           </div>
                         </div>
                       ))}
+                      <div ref={messagesEndRef} />
                     </div>
 
                     {/* Message Input */}
