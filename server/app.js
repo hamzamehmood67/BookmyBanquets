@@ -19,7 +19,10 @@ const prisma = new PrismaClient();
 // Initialize Socket.IO with CORS configuration
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // Frontend URL
+    origin: [
+      "http://localhost:5173", // Development URL
+      "https://bookmybanquets.netlify.app" // Production URL
+    ],
     methods: ["GET", "POST"],
     credentials: true
   }
