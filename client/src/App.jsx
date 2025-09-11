@@ -10,6 +10,7 @@ import HomeLayout from "./layout/homeLayout";
 import Home from "./pages/Venues";
 import HomeNew from "./pages/HomeNew";
 import HallProfile from "./pages/HallProfile";
+import SearchResults from "./pages/SearchResults";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ForgotPassword from "./pages/ForgotPassword";
 import ManagerDashboard from "./pages/ManagerDashboard";
@@ -64,6 +65,10 @@ const Router = createBrowserRouter([
       {
         path: "/locations",
         element: <Locations />,
+      },
+      {
+        path: "/search",
+        element: <SearchResults />,
       },
     ],
   },

@@ -2,16 +2,29 @@ import { useState } from "react";
 import { FiCalendar, FiMapPin, FiUsers, FiSearch } from "react-icons/fi";
 import DatePicker from "react-datepicker";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 const Hero = () => {
   const [location, setLocation] = useState("");
   const [eventDate, setEventDate] = useState(null);
   const [guestCount, setGuestCount] = useState("");
+  const navigate = useNavigate();
 
   const handleSearch = (e) => {
     e.preventDefault();
-    // Handle search logic here
-    console.log({ location, eventDate, guestCount });
+    
+    // Store search criteria in localStorage
+    const searchCriteria = {
+      location: location.trim(),
+      eventDate: eventDate ? eventDate.toISOString() : null,
+      guestCount: guestCount || null,
+      timestamp: new Date().toISOString()
+    };
+    
+    localStorage.setItem('searchCriteria', JSON.stringify(searchCriteria));
+    
+    // Navigate to search results page
+    navigate('/search');
   };
 
   return (
