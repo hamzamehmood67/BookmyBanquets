@@ -459,7 +459,7 @@ const AdminDashboard = () => {
                   {hall.status === 'pending' && (
                     <>
                       <button
-                        onClick={() => handleHallAction(hall.id, 'approved')}
+                        onClick={() => handleHallAction(hall.id, 'active')}
                         disabled={actionLoading}
                         className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
                       >
@@ -618,7 +618,7 @@ const AdminDashboard = () => {
               {selectedHall.status === 'pending' && (
                 <div className="flex gap-3">
                   <button
-                    onClick={() => handleHallAction(selectedHall.id, 'approved')}
+                    onClick={() => handleHallAction(selectedHall.id, 'active')}
                     disabled={actionLoading}
                     className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center"
                   >
