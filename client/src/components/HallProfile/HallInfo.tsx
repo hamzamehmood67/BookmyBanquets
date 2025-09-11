@@ -44,7 +44,7 @@ const HallInfo: React.FC<HallInfoProps> = ({ hallData }) => {
   const [reviewStats, setReviewStats] = useState({ avgRating: 0, reviewCount: 0 });
   const [bookingStats, setBookingStats] = useState({ totalBookings: 0, thisMonthBookings: 0 });
   
-  const API = 'http://localhost:3000/api/v1';
+  const API = 'http://13.53.187.108:3000/api/v1';
   
   // Check if user is a customer
   const isCustomer = user?.role === 'customer';

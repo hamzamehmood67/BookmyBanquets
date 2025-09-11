@@ -23,7 +23,7 @@ export const SocketProvider = ({ children }) => {
     console.log('SocketContext debug:', { user: !!user, token: !!token, hasUserData: !!user });
     if (user && token) {
       // Initialize socket connection
-      const newSocket = io(import.meta.env.VITE_API_URL || 'http://localhost:3000', {
+      const newSocket = io(import.meta.env.VITE_API_URL || 'http://13.53.187.108:3000', {
         auth: {
           token: token
         },

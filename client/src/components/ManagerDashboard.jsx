@@ -167,7 +167,7 @@ const Dashboard = () => {
   const messagesEndRef = useRef(null);
   
   // Base API
-  const API = 'http://localhost:3000/api/v1';
+  const API = 'http://13.53.187.108:3000/api/v1';
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -629,7 +629,7 @@ const Dashboard = () => {
       files.forEach(f => form.append('images', f));
 
       const res = await axios.post(
-        'http://localhost:3000/api/v1/upload/hall-images',
+        'http://13.53.187.108:3000/api/v1/upload/hall-images',
         form,
         {
           headers: {
@@ -757,7 +757,7 @@ const Dashboard = () => {
 
     try {
       await axios.post(
-        'http://localhost:3000/api/v1/upload/hall-images/delete',
+        'http://13.53.187.108:3000/api/v1/upload/hall-images/delete',
         { urls: [url] },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -807,7 +807,7 @@ const Dashboard = () => {
   useEffect(() => {
     const loadAmenities = async () => {
       try {
-        const { data } = await axios.get("http://localhost:3000/api/v1/amenity")
+        const { data } = await axios.get("http://13.53.187.108:3000/api/v1/amenity")
         setAmenities(data?.amenities ?? data) // depending on your controller shape
         console.log(amenities)
         // (optionally) pre-select some:
@@ -846,7 +846,7 @@ const Dashboard = () => {
         country: "Pakistan",
         postalCode
       }
-      const addrRes = await axios.post("http://localhost:3000/api/v1/address", addrPayload, {
+      const addrRes = await axios.post("http://13.53.187.108:3000/api/v1/address", addrPayload, {
         headers: { Authorization: `Bearer ${token}` }
       })
       const addressId = addrRes.data?.address?.addressId ?? addrRes.data.newAddress?.addressId
@@ -863,7 +863,7 @@ const Dashboard = () => {
         amenities: selectedAmenities // string[] of amenityId
       }
 
-      const hallRes = await axios.post("http://localhost:3000/api/v1/hall", payload, {
+      const hallRes = await axios.post("http://13.53.187.108:3000/api/v1/hall", payload, {
         headers: { Authorization: `Bearer ${token}` }
       })
       showAlert("Hall created successfully!", "success")

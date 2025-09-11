@@ -88,7 +88,7 @@ const Testimonials: React.FC<TestimonialsProps> = ({ hallData }) => {
   // Check if user is a customer
   const isCustomer = user?.role === 'customer';
   
-  const API = 'http://localhost:3000/api/v1';
+  const API = 'http://13.53.187.108:3000/api/v1';
 
   // Function to fetch latest reviews
   const fetchReviews = async () => {

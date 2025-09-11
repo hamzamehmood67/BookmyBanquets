@@ -44,7 +44,7 @@ const SearchResults = () => {
     const fetchHalls = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('http://localhost:3000/api/v1/hall');
+        const response = await axios.get('http://13.53.187.108:3000/api/v1/hall');
         
         // Handle different response formats
         let hallsData = [];

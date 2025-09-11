@@ -32,7 +32,7 @@ import {
 // import "./fonts.css"
 
 // API Configuration
-const API = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1"
+const API = import.meta.env.VITE_API_URL || "http://13.53.187.108:3000/api/v1"
 
 // Sample customer data
 const customerData = {

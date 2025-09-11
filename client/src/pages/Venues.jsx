@@ -5,7 +5,7 @@ import Footer from "../components/FooterNew";
 import Hero from "../components/Hero";
 import VenueGrid from "../components/VenueGrid";
 
-const API = "http://localhost:3000/api/v1";
+const API = "http://13.53.187.108:3000/api/v1";
 
 const firstImage = (imageURLs) => {
   if (!imageURLs) return "/placeholder.svg?height=300&width=500";

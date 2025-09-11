@@ -51,7 +51,7 @@ const HallProfile: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
 
-  const API = 'http://localhost:3000/api/v1';
+  const API = 'http://13.53.187.108:3000/api/v1';
 
   // Check if user is a customer
   const isCustomer = user?.role === 'customer';

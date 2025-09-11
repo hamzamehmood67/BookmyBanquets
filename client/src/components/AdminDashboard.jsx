@@ -43,7 +43,7 @@ const AdminDashboard = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const API = 'http://localhost:3000/api/v1';
+  const API = 'http://13.53.187.108:3000/api/v1';
 
   // Navigation tabs
   const navigationTabs = [

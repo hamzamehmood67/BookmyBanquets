@@ -91,7 +91,7 @@ const BookingSection: React.FC<BookingSectionProps> = ({ hallData }) => {
   const { user } = useAuth();
   const today = new Date();
   const maxDate = addDays(today, 365); // Allow bookings up to 1 year in advance
-  const API = 'http://localhost:3000/api/v1';
+  const API = 'http://13.53.187.108:3000/api/v1';
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
