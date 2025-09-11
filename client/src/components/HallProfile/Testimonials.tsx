@@ -102,19 +102,25 @@ const Testimonials: React.FC<TestimonialsProps> = ({ hallData }) => {
           name: review.user?.name || "Anonymous Customer",
           date: "Recent", // Since we don't have date in review schema
           event: "Verified Customer", // Since we don't have event type in review schema
-          rating: review.rating,
+          rating: review.rating || 5,
           image: `https://images.pexels.com/photos/${3760511 + index}/pexels-photo-${3760511 + index}.jpeg?auto=compress&cs=tinysrgb&w=120`, // Generate placeholder images
-          text: review.comment,
+          text: review.comment || "",
         }));
         setTestimonials(processedReviews);
+        // Reset active index if it's out of bounds
+        if (activeIndex >= processedReviews.length) {
+          setActiveIndex(0);
+        }
       } else {
         // Use fallback testimonials if no reviews
         setTestimonials(fallbackTestimonials);
+        setActiveIndex(0);
       }
     } catch (error) {
       console.error('Error fetching reviews:', error);
       // Use fallback testimonials on error
       setTestimonials(fallbackTestimonials);
+      setActiveIndex(0);
     }
   };
 
@@ -126,16 +132,27 @@ const Testimonials: React.FC<TestimonialsProps> = ({ hallData }) => {
         name: review.user?.name || "Anonymous Customer",
         date: "Recent", // Since we don't have date in review schema
         event: "Verified Customer", // Since we don't have event type in review schema
-        rating: review.rating,
+        rating: review.rating || 5,
         image: `https://images.pexels.com/photos/${3760511 + index}/pexels-photo-${3760511 + index}.jpeg?auto=compress&cs=tinysrgb&w=120`, // Generate placeholder images
-        text: review.comment,
+        text: review.comment || "",
       }));
       setTestimonials(processedReviews);
+      // Reset active index if it's out of bounds
+      if (activeIndex >= processedReviews.length) {
+        setActiveIndex(0);
+      }
     } else {
       // Fetch reviews separately if not included in hall data
       fetchReviews();
     }
   }, [hallData.reviews, hallData.hallId]);
+
+  // Handle activeIndex bounds when testimonials array changes
+  useEffect(() => {
+    if (testimonials.length > 0 && activeIndex >= testimonials.length) {
+      setActiveIndex(0);
+    }
+  }, [testimonials.length, activeIndex]);
 
   const nextTestimonial = () => {
     setActiveIndex((prevIndex) =>
@@ -243,8 +260,14 @@ const Testimonials: React.FC<TestimonialsProps> = ({ hallData }) => {
     return () => clearInterval(interval);
   }, [autoplay, activeIndex]);
 
-  if (testimonials.length === 0) {
-    return null; // Don't render if no testimonials
+  if (testimonials.length === 0 || !testimonials[activeIndex]) {
+    return null; // Don't render if no testimonials or current testimonial is invalid
+  }
+
+  // Safety check for current testimonial
+  const currentTestimonial = testimonials[activeIndex];
+  if (!currentTestimonial) {
+    return null;
   }
 
   return (
@@ -356,7 +379,7 @@ const Testimonials: React.FC<TestimonialsProps> = ({ hallData }) => {
                   <div className="flex-shrink-0">
                     <div className="w-24 h-24 rounded-full overflow-hidden bg-gradient-to-br from-[#9D2235] to-[#FF477E] flex items-center justify-center">
                       <span className="text-white text-2xl font-bold">
-                        {testimonials[activeIndex].name.charAt(0)}
+                        {currentTestimonial.name?.charAt(0) || 'A'}
                       </span>
                     </div>
                   </div>
@@ -369,7 +392,7 @@ const Testimonials: React.FC<TestimonialsProps> = ({ hallData }) => {
                           key={i}
                           size={18}
                           className={`${
-                            i < testimonials[activeIndex].rating
+                            i < (currentTestimonial.rating || 0)
                               ? "text-yellow-500 fill-yellow-500"
                               : "text-gray-300"
                           }`}
@@ -378,17 +401,17 @@ const Testimonials: React.FC<TestimonialsProps> = ({ hallData }) => {
                     </div>
 
                     <p className="text-gray-700 text-lg mb-6">
-                      "{testimonials[activeIndex].text}"
+                      "{currentTestimonial.text || ''}"
                     </p>
 
                     <div>
                       <h4 className="text-lg font-bold text-gray-900">
-                        {testimonials[activeIndex].name}
+                        {currentTestimonial.name || 'Anonymous Customer'}
                       </h4>
                       <div className="flex flex-wrap gap-x-4 text-sm text-gray-600 mt-1">
-                        <span>{testimonials[activeIndex].event}</span>
+                        <span>{currentTestimonial.event || 'Verified Customer'}</span>
                         <span>•</span>
-                        <span>{testimonials[activeIndex].date}</span>
+                        <span>{currentTestimonial.date || 'Recent'}</span>
                       </div>
                     </div>
                   </div>
