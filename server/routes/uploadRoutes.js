@@ -10,8 +10,9 @@ router.post('/hall-images',
   (req, res) => {
     try {
       const files = req.files || [];
-      const baseURL = `${req.protocol}://${req.get('host')}`;
-      const urls = files.map(f => `${baseURL}/uploads/halls/${f.filename}`);
+      // const baseURL = `${req.protocol}://${req.get('host')}`;
+      // const urls = files.map(f => `${baseURL}/uploads/halls/${f.filename}`);
+      const urls = files.map(f => `/uploads/halls/${f.filename}`);
       return res.status(201).json({ success: true, urls });
     } catch (err) {
       return res.status(500).json({ success: false, error: 'Upload failed', details: err.message });
