@@ -6,6 +6,7 @@ const addressRouter = require('./addressRoutes');
 const amenitiesRouter = require('./amenityRoutes');
 const bookingRouter = require('./bookingRoutes');
 const chatRouter = require('./chatRoutes');
+const adminRouter = require('./adminRoutes');
 
 
 router.get('/', (req, res) => {
@@ -19,5 +20,6 @@ router.use('/address', addressRouter);
 router.use('/amenity', amenitiesRouter);
 router.use('/booking', bookingRouter);
 router.use('/chat', chatRouter);
+router.use('/admin', adminRouter);
 
 module.exports = router;

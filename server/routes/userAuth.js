@@ -220,4 +220,57 @@ const generateVerificationToken = (email) => {
     return jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '24h' });
 };
 
+// Admin Login Route
+router.post('/admin/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        // Validate input
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password are required' });
+        }
+
+        // Find admin by email
+        const admin = await prisma.admin.findUnique({
+            where: { email: email.toLowerCase() }
+        });
+
+        if (!admin) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        // Check password (plain text comparison as requested)
+        if (admin.password !== password) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        // Generate JWT token
+        const token = jwt.sign(
+            { 
+                userId: admin.adminId, 
+                email: admin.email, 
+                role: 'admin' 
+            }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: '24h' }
+        );
+
+        // Return success response
+        res.status(200).json({
+            message: 'Admin login successful',
+            user: {
+                userId: admin.adminId,
+                email: admin.email,
+                role: 'admin',
+                name: 'Admin' // Default name since not in schema
+            },
+            token: token
+        });
+
+    } catch (error) {
+        console.error('Admin login error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 module.exports = router;
