@@ -27,7 +27,7 @@ const EmailVerification = () => {
 
       try {
         await axios.get(
-          `http://localhost:3000/api/v1/user/verify-email?token=${token}`
+          `http://13.53.187.108:3000/api/v1/user/verify-email?token=${token}`
         );
         setSuccess(true);
         showAlert("Email verified successfully!", "success");

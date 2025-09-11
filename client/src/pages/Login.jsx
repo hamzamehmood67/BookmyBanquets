@@ -45,14 +45,14 @@ const Login = () => {
     setIsSubmitted(true);
     try {
       const res = await axios.post(
-        "http://localhost:3000/api/v1/user/login",
+        "http://13.53.187.108:3000/api/v1/user/login",
         formData
       );
       console.log("Response:", res);
       if (res.status === 200) {
         console.log("Login successful:", res.data);
         login(res.data.user, res.data.token);
-        showAlert("Login successful!", "success"); // Use showAlert here
+        showAlert("Login successful!", "success");
         navigate("/"); // Redirect to the home page after successful login
       }
     } catch (e) {

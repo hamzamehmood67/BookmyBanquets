@@ -26,7 +26,7 @@ router.post('/', authenticateHallManager, createHall);  // Hall Manager - Create
 router.put('/:id', authenticateHallManager,verifyHallOwnership, updateHall); // Hall Manager - Update hall
 router.delete('/:id', authenticateHallManager,verifyHallOwnership, deleteHall); // Hall Manager - Delete hall
 router.get('/:id/amenities', getHallAmenities);         // Public - Get amenities of a hall
-router.get('/:id/bookings', authenticateHallManager,verifyHallOwnership, getHallBookings); // Protected - Bookings for hall
+router.get('/:id/bookings', getHallBookings); // Protected - Bookings for hall
 
 // Advanced 
 router.get('/search/query', searchHalls);               // Public - Search halls

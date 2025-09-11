@@ -60,15 +60,19 @@ model Hall {
   bookings  Booking[]
   reviews   Review[]
   amenities AmenitiesHall[]
+  chats     Chat[]
 }
 
 model Booking {
   bookingId      String   @id @default(uuid())
-  status         String
+  status         String   @default("pending")
   createdAt      DateTime @default(now())
   startDate      DateTime
   endDate        DateTime
   days           Int
+  timeSlot       String   // morning, afternoon, evening
+  timeSlotLabel  String   // Human readable time slot label
+  duration       Int      // Duration in hours
   bookingDetails String
   price          Float
   guests         Int
@@ -101,6 +105,9 @@ model Chat {
 
   toId String
   to   User   @relation("ChatTo", fields: [toId], references: [userId])
+
+  hallId String
+  hall   Hall   @relation(fields: [hallId], references: [hallId])
 
   messages Message[]
 }

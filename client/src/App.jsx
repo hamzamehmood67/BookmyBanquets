@@ -10,10 +10,13 @@ import HomeLayout from "./layout/homeLayout";
 import Home from "./pages/Venues";
 import HomeNew from "./pages/HomeNew";
 import HallProfile from "./pages/HallProfile";
+import SearchResults from "./pages/SearchResults";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ForgotPassword from "./pages/ForgotPassword";
 import ManagerDashboard from "./pages/ManagerDashboard";
 import HallCustomerDashboard from "./pages/HallCustomerDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
+import AdminLogin from "./pages/AdminLogin";
 import Contact from "./pages/contact";
 import Services from "./pages/services";
 import Locations from "./pages/Locations";
@@ -65,7 +68,23 @@ const Router = createBrowserRouter([
         path: "/locations",
         element: <Locations />,
       },
+      {
+        path: "/search",
+        element: <SearchResults />,
+      },
     ],
+  },
+  {
+    path: "/admin-dashboard",
+    element: (
+      <ProtectedRoute allowedRoles={["admin"]}>
+        <AdminDashboard />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/admin/login",
+    element: <AdminLogin />,
   },
   {
     path: "/hall/:id",
