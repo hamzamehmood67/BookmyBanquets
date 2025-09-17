@@ -13,14 +13,33 @@ const verifyToken = (req) => {
 };
 
 // Generic authentication middleware
-const authenticateUser = (req, res, next) => {
+const authenticateUser = async (req, res, next) => {
   try {
     const decoded = verifyToken(req);
-    req.user = decoded;
-    req.userId = decoded.userId;
-    req.role = decoded.role;
-    next();
+    
+    // If the token has userId directly, use it
+    if (decoded.userId) {
+      req.user = decoded;
+      req.userId = decoded.userId;
+      req.role = decoded.role;
+      next();
+    } else {
+      // Fallback: fetch user from database using email (for old tokens)
+      const user = await prisma.user.findUnique({
+        where: { email: decoded.email },
+      });
+
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      req.user = { userId: user.userId, email: user.email, role: user.role };
+      req.userId = user.userId;
+      req.role = user.role;
+      next();
+    }
   } catch (err) {
+    console.error("Auth error:", err.message);
     return res.status(401).json({ message: "Unauthorized or invalid token" });
   }
 };

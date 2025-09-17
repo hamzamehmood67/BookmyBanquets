@@ -1,24 +1,132 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Users, MapPin, Clock, Star, ThumbsUp } from "lucide-react";
+import axios from "axios";
+import { useAuth } from "../../context/AuthContext";
 
-const HallInfo: React.FC = () => {
+interface HallData {
+  hallId: string;
+  name: string;
+  description: string;
+  capacity: number;
+  price: number;
+  imageURLs: string;
+  status: string;
+  address: {
+    addressLine: string;
+    city: string;
+    state: string;
+    country: string;
+  };
+  amenities: Array<{
+    amenity: {
+      amenityId: string;
+      name: string;
+      description: string;
+    };
+  }>;
+  reviews: Array<{
+    reviewId: string;
+    rating: number;
+    comment: string;
+    user: {
+      name: string;
+    };
+  }>;
+}
+
+interface HallInfoProps {
+  hallData: HallData;
+}
+
+const HallInfo: React.FC<HallInfoProps> = ({ hallData }) => {
+  const { user } = useAuth(); // Get user from auth context
+  const [reviewStats, setReviewStats] = useState({ avgRating: 0, reviewCount: 0 });
+  const [bookingStats, setBookingStats] = useState({ totalBookings: 0, thisMonthBookings: 0 });
+  
+  const API = 'http://13.53.187.108:3000/api/v1';
+  
+  // Check if user is a customer
+  const isCustomer = user?.role === 'customer';
+
+  useEffect(() => {
+    // Calculate review statistics
+    if (hallData.reviews && hallData.reviews.length > 0) {
+      const totalRating = hallData.reviews.reduce((sum, review) => sum + review.rating, 0);
+      const avgRating = totalRating / hallData.reviews.length;
+      setReviewStats({
+        avgRating: Math.round(avgRating * 10) / 10,
+        reviewCount: hallData.reviews.length
+      });
+    }
+
+    // Fetch booking statistics (optional - can be hardcoded for now)
+    const fetchBookingStats = async () => {
+      try {
+        const response = await axios.get(`${API}/hall/${hallData.hallId}/bookings`);
+        const bookings = response.data;
+        const thisMonth = new Date();
+        const thisMonthBookings = bookings.filter((booking: any) => {
+          const bookingDate = new Date(booking.startDate);
+          return bookingDate.getMonth() === thisMonth.getMonth() && 
+                 bookingDate.getFullYear() === thisMonth.getFullYear();
+        }).length;
+        
+        setBookingStats({
+          totalBookings: bookings.length,
+          thisMonthBookings
+        });
+      } catch (error) {
+        // If we can't fetch bookings (likely due to permissions), use fallback data
+        console.log('Using fallback booking stats');
+      }
+    };
+
+    fetchBookingStats();
+  }, [hallData]);
+
+  // Format price range based on hall price
+  const getPriceRange = (price: number) => {
+    if (price < 100000) return "₹₹";
+    if (price < 200000) return "₹₹₹";
+    return "₹₹₹₹";
+  };
+
+  // Determine category based on price and amenities count
+  const getCategory = (price: number, amenitiesCount: number) => {
+    if (price > 300000 || amenitiesCount > 8) return "Luxury";
+    if (price > 150000 || amenitiesCount > 5) return "Premium";
+    return "Standard";
+  };
+
   const hallDetails = {
-    name: "Royal Palace Banquet Hall",
-    rating: 4.8,
-    reviews: 246,
-    category: "Premium",
+    name: hallData.name,
+    rating: reviewStats.avgRating || 4.5, // Fallback rating if no reviews
+    reviews: reviewStats.reviewCount,
+    category: getCategory(hallData.price, hallData.amenities?.length || 0),
     capacity: {
-      min: 100,
-      max: 500,
+      min: Math.max(50, Math.floor(hallData.capacity * 0.6)), // Assume 60% minimum capacity
+      max: hallData.capacity,
     },
-    address: "123 Barkat Market, Lahore District, Lahore",
-    timings: "10:00 AM - 11:00 PM",
-    priceRange: "₹₹₹₹",
+    address: `${hallData.address.addressLine}, ${hallData.address.city}, ${hallData.address.state}`,
+    timings: "10:00 AM - 11:00 PM", // Hardcoded as not available in backend
+    priceRange: getPriceRange(hallData.price),
     quickStats: [
-      { label: "Booked", value: "85%", subtext: "This month" },
-      { label: "Events", value: "450+", subtext: "Completed" },
-      { label: "Experience", value: "12 yrs", subtext: "In business" },
+      { 
+        label: "Capacity", 
+        value: `${hallData.capacity}`, 
+        subtext: "Max guests" 
+      },
+      { 
+        label: "Price", 
+        value: `PKR ${(hallData.price / 1000).toFixed(0)}K`, 
+        subtext: "Starting from" 
+      },
+      { 
+        label: "Amenities", 
+        value: `${hallData.amenities?.length || 0}+`, 
+        subtext: "Available" 
+      },
     ],
   };
 
@@ -48,25 +156,19 @@ const HallInfo: React.FC = () => {
                   <span className="text-gray-600">
                     {hallDetails.reviews} reviews
                   </span>
-                  <span className="ml-3 px-2 py-0.5 bg-[#9D2235]/10 text-[#FF477E] rounded-full font-medium">
+                  <span className="ml-3 px-2 py-0.5 bg-[#9D2235]/10 text-[#9D2235] rounded-full font-medium">
                     {hallDetails.category}
                   </span>
                 </div>
               </div>
 
-              {/* Pricing Indicator */}
-              <div className="hidden md:block">
-                <span className="text-xl font-semibold text-[#FF477E]">
-                  {hallDetails.priceRange}
-                </span>
-                <p className="text-xs text-gray-500 mt-1">Price range</p>
-              </div>
+          
             </div>
 
             {/* Key Info */}
             <div className="mt-6 space-y-3">
               <div className="flex items-center text-gray-700">
-                <Users className="h-5 w-5 text-[#FF477E] mr-3" />
+                <Users className="h-5 w-5 text-[#9D2235] mr-3" />
                 <span>
                   Capacity:{" "}
                   <span className="font-medium">
@@ -77,12 +179,12 @@ const HallInfo: React.FC = () => {
               </div>
 
               <div className="flex items-center text-gray-700">
-                <MapPin className="h-5 w-5 text-[#FF477E] mr-3" />
+                <MapPin className="h-5 w-5 text-[#9D2235] mr-3" />
                 <span>{hallDetails.address}</span>
               </div>
 
               <div className="flex items-center text-gray-700">
-                <Clock className="h-5 w-5 text-[#FF477E] mr-3" />
+                <Clock className="h-5 w-5 text-[#9D2235] mr-3" />
                 <span>
                   Timings:{" "}
                   <span className="font-medium">{hallDetails.timings}</span>
@@ -90,17 +192,19 @@ const HallInfo: React.FC = () => {
               </div>
             </div>
 
-            {/* CTA for Mobile */}
-            <div className="mt-6 lg:hidden">
-              <motion.a
-                href="#booking"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="block w-full py-3 bg-[#FF477E] text-white text-center font-medium rounded-full hover:bg-[#8a1e2f] transition-all"
-              >
-                Check Availability
-              </motion.a>
-            </div>
+            {/* CTA for Mobile - Only for customers */}
+            {isCustomer && (
+              <div className="mt-6 lg:hidden">
+                <motion.a
+                  href="#booking"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="block w-full py-3 bg-[#FF477E] text-white text-center font-medium rounded-full hover:bg-[#8a1e2f] transition-all"
+                >
+                  Check Availability
+                </motion.a>
+              </div>
+            )}
           </div>
 
           {/* Right Section: Quick Stats */}
@@ -115,7 +219,7 @@ const HallInfo: React.FC = () => {
                   transition={{ duration: 0.4, delay: 0.1 * index }}
                   className="bg-gray-50 rounded-xl p-4 text-center"
                 >
-                  <div className="text-xl md:text-2xl font-bold text-[#FF477E]">
+                  <div className="text-xl md:text-2xl font-bold text-[#9D2235]">
                     {stat.value}
                   </div>
                   <div className="text-sm font-medium text-gray-800">
@@ -126,17 +230,19 @@ const HallInfo: React.FC = () => {
               ))}
             </div>
 
-            {/* CTA for Desktop */}
-            <div className="hidden lg:block mt-6">
-              <motion.a
-                href="#booking"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="block w-full py-3 bg-[#FF477E] text-white text-center font-medium rounded-full hover:bg-[#8a1e2f] transition-all"
-              >
-                Check Availability
-              </motion.a>
-            </div>
+            {/* CTA for Desktop - Only for customers */}
+            {isCustomer && (
+              <div className="hidden lg:block mt-6">
+                <motion.a
+                  href="#booking"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="block w-full py-3 bg-[#FF477E] text-white text-center font-medium rounded-full hover:bg-[#8a1e2f] transition-all"
+                >
+                  Check Availability
+                </motion.a>
+              </div>
+            )}
           </div>
         </div>
 
@@ -145,13 +251,20 @@ const HallInfo: React.FC = () => {
           <div className="flex items-center">
             <ThumbsUp className="h-5 w-5 text-green-600 mr-2" />
             <span className="text-sm font-medium text-gray-700">
-              98% of couples recommend this venue
+              {reviewStats.reviewCount > 0 
+                ? `${Math.round((reviewStats.avgRating / 5) * 100)}% of customers recommend this venue`
+                : 'No reviews yet'
+              }
             </span>
           </div>
           <div className="mt-2 w-full bg-gray-200 rounded-full h-2.5">
             <motion.div
               initial={{ width: 0 }}
-              whileInView={{ width: "98%" }}
+              whileInView={{ 
+                width: reviewStats.reviewCount > 0 
+                  ? `${Math.round((reviewStats.avgRating / 5) * 100)}%`
+                  : "0%" 
+              }}
               viewport={{ once: true }}
               transition={{ duration: 1, delay: 0.5 }}
               className="bg-green-500 h-2.5 rounded-full"

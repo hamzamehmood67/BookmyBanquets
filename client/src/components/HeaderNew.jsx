@@ -17,9 +17,16 @@ const Header = ({ isScrolled }) => {
     { name: "Contact", href: "/contact" },
   ];
   if (isLoggedIn) {
+    let dashboardHref = "/customer-dashboard"; // Default
+    if (user.role === "admin") {
+      dashboardHref = "/admin-dashboard";
+    } else if (user.role === "manager") {
+      dashboardHref = "/manager-dashboard";
+    }
+    
     navLinks.push({
       name: "Dashboard",
-      href: user.role === "manager" ? "/manager-dashboard" : "/customer-dashboard",
+      href: dashboardHref,
     });
   }
 

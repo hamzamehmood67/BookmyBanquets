@@ -2,7 +2,43 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-const images = [
+interface HallData {
+  hallId: string;
+  name: string;
+  description: string;
+  capacity: number;
+  price: number;
+  imageURLs: string;
+  status: string;
+  address: {
+    addressLine: string;
+    city: string;
+    state: string;
+    country: string;
+  };
+  amenities: Array<{
+    amenity: {
+      amenityId: string;
+      name: string;
+      description: string;
+    };
+  }>;
+  reviews: Array<{
+    reviewId: string;
+    rating: number;
+    comment: string;
+    user: {
+      name: string;
+    };
+  }>;
+}
+
+interface HeroGalleryProps {
+  hallData: HallData;
+}
+
+// Fallback images if hall has no images
+const fallbackImages = [
   {
     url: "https://images.pexels.com/photos/169190/pexels-photo-169190.jpeg",
     caption: "Elegant Grand Ballroom"
@@ -25,9 +61,26 @@ const images = [
   }
 ];
 
-const HeroGallery: React.FC = () => {
+const HeroGallery: React.FC<HeroGalleryProps> = ({ hallData }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [images, setImages] = useState(fallbackImages);
+
+  useEffect(() => {
+    // Process hall images from backend
+    if (hallData?.imageURLs) {
+      const imageUrls = hallData.imageURLs.split(',').filter(url => url.trim());
+      if (imageUrls.length > 0) {
+        const processedImages = imageUrls.map((url, index) => ({
+          url: url.trim(),
+          caption: `${hallData.name} - View ${index + 1}`
+        }));
+        setImages(processedImages);
+        // Reset currentIndex if it's out of bounds
+        setCurrentIndex(0);
+      }
+    }
+  }, [hallData]);
 
   useEffect(() => {
     const preloadImages = () => {
@@ -47,21 +100,24 @@ const HeroGallery: React.FC = () => {
     }, 6000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [images]); // Add images as dependency
 
   const goToPrevious = () => {
+    if (images.length === 0) return;
     setCurrentIndex(prevIndex => 
       prevIndex === 0 ? images.length - 1 : prevIndex - 1
     );
   };
 
   const goToNext = () => {
+    if (images.length === 0) return;
     setCurrentIndex(prevIndex => 
       prevIndex === images.length - 1 ? 0 : prevIndex + 1
     );
   };
 
   const goToSlide = (index: number) => {
+    if (images.length === 0 || index >= images.length) return;
     setCurrentIndex(index);
   };
 
@@ -75,23 +131,25 @@ const HeroGallery: React.FC = () => {
       )}
       
       {/* Gallery Images */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentIndex}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 1 }}
-          className="absolute inset-0"
-        >
+      {images.length > 0 && (
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentIndex}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1 }}
+            className="absolute inset-0"
+          >
           <div 
             className="absolute inset-0 bg-center bg-cover" 
-            style={{ backgroundImage: `url(${images[currentIndex].url})` }}
+            style={{ backgroundImage: `url(${images[currentIndex]?.url || fallbackImages[0].url})` }}
           >
             <div className="absolute inset-0 bg-black bg-opacity-40"></div>
           </div>
-        </motion.div>
-      </AnimatePresence>
+          </motion.div>
+        </AnimatePresence>
+      )}
 
       {/* Gradient Overlay */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/80"></div>
@@ -113,7 +171,7 @@ const HeroGallery: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.2 }}
             >
-              Royal Palace Banquet Hall
+              {hallData.name}
             </motion.h1>
             <motion.p 
               className="text-xl md:text-2xl mb-8 max-w-2xl mx-auto text-white/90"
@@ -121,7 +179,7 @@ const HeroGallery: React.FC = () => {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.7, delay: 0.4 }}
             >
-              {images[currentIndex].caption}
+              {images[currentIndex]?.caption || fallbackImages[0].caption}
             </motion.p>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -133,7 +191,7 @@ const HeroGallery: React.FC = () => {
                 href="#booking"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-8 py-3 rounded-full bg-[#9D2235] text-white font-medium text-lg transition-all hover:bg-[#8a1e2f]"
+                className="px-8 py-3 rounded-full bg-[#FF477E] text-white font-medium text-lg transition-all hover:bg-[#8a1e2f]"
               >
                 Book Now
               </motion.a>
@@ -168,18 +226,20 @@ const HeroGallery: React.FC = () => {
       </button>
 
       {/* Indicators */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex space-x-2">
-        {images.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => goToSlide(index)}
-            className={`w-2.5 h-2.5 rounded-full transition-all ${
-              currentIndex === index ? 'bg-white w-8' : 'bg-white/50'
-            }`}
-            aria-label={`Go to slide ${index + 1}`}
-          />
-        ))}
-      </div>
+      {images.length > 0 && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex space-x-2">
+          {images.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => goToSlide(index)}
+              className={`w-2.5 h-2.5 rounded-full transition-all ${
+                currentIndex === index ? 'bg-white w-8' : 'bg-white/50'
+              }`}
+              aria-label={`Go to slide ${index + 1}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

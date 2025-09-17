@@ -190,6 +190,7 @@ const listPublicHalls = async (req, res) => {
 };
 
  const getHallBookings = async (req, res) => {
+  console.log(req.params.id);
   try {
     const bookings = await prisma.booking.findMany({ where: { hallId: req.params.id } });
     res.json(bookings);
@@ -267,10 +268,29 @@ const listPublicHalls = async (req, res) => {
 
  const getHallReviews = async (req, res) => {
   try {
-    const reviews = await prisma.review.findMany({ where: { hallId: req.params.id } });
-    res.json(reviews);
+    const reviews = await prisma.review.findMany({ 
+      where: { hallId: req.params.id },
+      include: {
+        user: {
+          select: {
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        reviewId: 'desc' // Order by creation (newest first)
+      }
+    });
+    res.json({
+      status: 'success',
+      data: reviews
+    });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to get reviews' });
+    console.error('Get reviews error:', err);
+    res.status(500).json({ 
+      status: 'error',
+      error: 'Failed to get reviews' 
+    });
   }
 };
 

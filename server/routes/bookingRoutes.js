@@ -1,33 +1,36 @@
-import express from "express";
-import {
+const express = require("express");
+const {
   createBooking,
   getMyBookings,
   cancelBooking,
   getBookingsByHallId,
   approveBooking,
   rejectBooking,
-  getAllBookings // Optional (Admin)
-} from "../controllers/booking.controller.js";
+  getAllBookings,
+  checkAvailableTimeSlots
+} = require("../controllers/bookingControllers.js");
 
-import {
+const {
   authenticateUser,
-  authenticateHallManager,
-  authenticateAdmin
-} from "../middlewares/auth.js";
+  authenticateHallManager
+} = require("../middlewares/auth.js");
 
 const router = express.Router();
 
+// Public routes
+router.get("/availability", checkAvailableTimeSlots); // Check available time slots for a date
 
-
+// Customer routes (authenticated)
 router.post("/", authenticateUser, createBooking);
 router.get("/my", authenticateUser, getMyBookings);
 router.delete("/:id", authenticateUser, cancelBooking);
 
+// Hall Manager routes (authenticated)
 router.get("/hall/:hallId", authenticateHallManager, getBookingsByHallId);
 router.patch("/:id/approve", authenticateHallManager, approveBooking);
 router.patch("/:id/reject", authenticateHallManager, rejectBooking);
 
-router.get("/all", authenticateAdmin, getAllBookings);
+// Admin routes (would need authenticateAdmin middleware)
+// router.get("/all", authenticateAdmin, getAllBookings);
 
-
-export default router;
+module.exports = router;
